@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Ops</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/ao.css">
+<style>
+  /* Question: "how much did my agents consume (API-price equivalent), and where did it go?" */
+  .g2 { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; align-items: start; }
+  .bars { display: flex; align-items: flex-end; gap: 6px; height: 200px; }
+  .bars > div { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; min-width: 0; }
+  .bars .col { display: flex; flex-direction: column-reverse; border-radius: 4px 4px 1px 1px; overflow: hidden; transform-origin: bottom; animation: rise 1s cubic-bezier(.16,1,.3,1) both; }
+  .bars .col.today { outline: 1px dashed var(--gold); outline-offset: 1px; opacity: .75; }
+  .bars .col i { display: block; }
+  .bax { display: flex; gap: 6px; font-size: 10.5px; color: var(--faint); margin-top: 5px; } .bax span { flex: 1; text-align: center; min-width: 0; }
+  .yax { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--faint); margin-bottom: 4px; }
+  .legend { display: flex; gap: 14px; font-size: 11.5px; color: var(--dim); margin-top: 10px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .kv { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 7px 16px; font-size: 13px; align-items: center; margin-top: 12px; }
+  .kv .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 7px; }
+  .price { font-size: 12.5px; } .price td, .price th { padding: 7px 6px; }
+  .price input { width: 62px; background: transparent; border: 1px solid var(--hair2); border-radius: 6px; color: var(--txt); font: inherit; padding: 3px 6px; text-align: right; font-variant-numeric: tabular-nums; }
+  .price input:focus { outline: none; border-color: var(--gold); }
+  .bset { background: transparent; border: 1px dashed var(--hair2); border-radius: 8px; color: var(--gold); font: inherit; font-size: 13px; padding: 6px 12px; cursor: pointer; }
+  .bset:hover { border-color: var(--gold); }
+  .binp { width: 90px; background: transparent; border: 1px solid var(--gold); border-radius: 6px; color: var(--txt); font: inherit; padding: 2px 6px; text-align: right; }
+  .bedit { cursor: pointer; border-bottom: 1px dotted var(--faint); }
+  .tbar { display: flex; height: 6px; border-radius: 6px; overflow: hidden; background: var(--hair); }
+  .ttl { max-width: 250px; }
+  @media (max-width: 1200px) { .g2 { grid-template-columns: minmax(0, 1fr); } }
+</style>
+</head>
+<body>
+<script src="/assets/ao.js"></script>
+<script src="/assets/live.js"></script>
+<div class="wrap" id="app"></div>
+<script>
+let pend = {}, timer = null;
+const editing = () => !!timer || !!(document.activeElement && document.activeElement.closest && document.activeElement.closest('#app .price, #budBox'));
+const post = body => fetch('/api/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); AO.reload(); }).catch(() => { if (AO.toast) AO.toast(AO.lang === 'en' ? 'Save failed' : 'Lưu lỗi'); });
+function flush() { const prices = pend; pend = {}; timer = null; if (Object.keys(prices).length) post({ prices }); }
+function bind() {
+  document.querySelectorAll('#app .price input').forEach(i => {
+    i.oninput = () => { const v = parseFloat(i.value); if (!Number.isFinite(v) || v < 0) return; (pend[i.dataset.m] = pend[i.dataset.m] || {})[i.dataset.k] = v; clearTimeout(timer); timer = setTimeout(flush, 600); };
+    i.onblur = () => { if (!timer) AO.reload(); };
+  });
+  const open = el => { const box = document.createElement('span'); box.id = 'budBox';
+    box.innerHTML = '<input class="binp" type="number" step="1" min="0" aria-label="budget">';
+    const inp = box.firstChild; if (AO.D.config.budget != null) inp.value = AO.D.config.budget;
+    el.replaceWith(box); inp.focus(); inp.select(); let done = false;
+    const commit = save => { if (done) return; done = true; const raw = inp.value.trim(), v = parseFloat(raw);
+      if (save && (raw === '' || (Number.isFinite(v) && v >= 0))) post({ budget: raw === '' ? null : v }); else AO.reload(); box.remove(); };
+    inp.onkeydown = e => { if (e.key === 'Enter') commit(true); else if (e.key === 'Escape') commit(false); };
+    inp.onblur = () => commit(true); };
+  const b1 = document.getElementById('budSet'), b2 = document.getElementById('budEdit');
+  if (b1) b1.onclick = () => open(b1);
+  if (b2) { b2.onclick = () => open(b2); b2.onkeydown = e => { if (e.key === 'Enter') open(b2); }; }
+}
+AO.live(function render(D) {
+const app = document.getElementById('app');
+if (editing()) return;
+const { t } = AO, NOW = AO.NOW, W = AO.win(), PW = AO.prevWin();
+const list = AO.list(W), prev = AO.state === 'empty' ? [] : AO.sessions(PW);
+let h = AO.banner();
+if (!list.length) { h += `<div class="panel" style="margin-top:16px">${AO.emptyState()}</div>`; app.innerHTML = AO.header('cost') + h; AO.init(); return; }
+const cur = AO.sumDays(list, W), before = AO.sumDays(prev, PW);
+const todayK = AO.dayKey(NOW), today = AO.sumDays(list, [Date.parse(todayK + 'T00:00:00+07:00'), NOW]);
+const subCost = list.reduce((a, s) => a + s.subCost, 0), allCost = list.reduce((a, s) => a + s.cost, 0) || 1;
+const byModel = {}; for (const s of list) for (const [m, v] of Object.entries(s.byModel)) { if (m === '<synthetic>') continue; const x = byModel[m] = byModel[m] || { tok: 0, cr: 0, cost: 0 }; x.tok += v.in + v.out + v.cw + v.cr; x.cr += v.cr; x.cost += v.cost; }
+const KEYS = ['in', 'out', 'cw', 'cr'], P = AO.D.price || {};
+const priced = m => !!P[m] && KEYS.every(k => Number.isFinite(P[m][k]));
+const tableModels = [...new Set([...Object.keys(P), ...Object.keys(byModel)])];
+const saved = Object.entries(byModel).filter(([m]) => priced(m)).reduce((a, [m, v]) => a + v.cr * (P[m].in - P[m].cr) / 1e6, 0);
+const topModel = Object.entries(byModel).sort((a, b) => b[1].cost - a[1].cost)[0] || ['—', { cost: 0, tok: 0 }];
+const delta = (a, b) => !b ? `<span class="faint">${t('vs.prev')}: —</span>` : `${a >= b ? '▲' : '▼'} ${AO.pct(Math.abs(a - b) / b, 0)} <span class="faint">${AO.range === 'today' ? t('vs.yesterday') : t('vs.prev')}</span>`;
+
+h += `<div class="strip" style="--n:6;margin-top:16px">
+  <div><div class="eyebrow" data-tip="${AO.tip(t('tip.cost'))}">${t('k.cost')} ⓘ</div><div class="v">${AO.usd(cur.cost)}</div><div class="d">${delta(cur.cost, before.cost)}</div></div>
+  <div><div class="eyebrow">${t('range.today')}</div><div class="v">${AO.usd(today.cost)}</div><div class="d">${list.filter(s => s.status !== 'stop').length} ${t('st.run').toLowerCase()} · ${t('st.wait').toLowerCase()}</div></div>
+  <div><div class="eyebrow">${AO.lang === 'en' ? 'Per session' : 'TB / phiên'}</div><div class="v">${AO.usd(cur.cost / list.length)}</div><div class="d">max ${AO.usd(Math.max(...list.map(s => s.cost)))}</div></div>
+  <div><div class="eyebrow">${t('k.subagents')}</div><div class="v">${AO.pct(subCost / allCost, 0)}</div><div class="d">${AO.usd(subCost)}</div></div>
+  <div><div class="eyebrow">Model</div><div class="v" style="font-size:20px;margin-top:7px">${AO.esc(AO.model(topModel[0]))}</div><div class="d">${AO.pct(topModel[1].cost / allCost, 0)} · ${AO.usd(topModel[1].cost)}</div></div>
+  <div><div class="eyebrow" data-tip="${AO.tip(t('tip.saved'))}">${AO.lang === 'en' ? 'Cache savings' : 'Nhờ cache'} ⓘ</div><div class="v dim">≈${AO.usd(saved, 0)}</div><div class="d">${t('x.est')}</div></div>
+</div>`;
+
+// daily stacked bars (real per-type cost per day)
+const days = []; for (let d = W[0]; d <= NOW; d += 864e5) days.push(AO.dayKey(d));
+const per = days.map(d => { const o = { cr: 0, cw: 0, out: 0, in: 0 }; for (const s of list) { const v = s.byDay[d]; if (v) for (const k in o) o[k] += v[k]; } o.tot = o.cr + o.cw + o.out + o.in; return o; });
+const maxD = Math.max(...per.map(p => p.tot), 1), nice = Math.ceil(maxD / 50) * 50;
+const step = days.length > 14 ? Math.ceil(days.length / 10) : 1;
+h += `<div class="g2"><section class="panel"><div class="ph"><h3>${t('p.byday')}</h3><span class="r">${AO.lang === 'en' ? 'stacked by token type' : 'xếp chồng theo loại token'}</span></div>
+  <div class="yax"><span>${AO.usd(nice, 0)}</span><span></span></div>
+  <div class="bars">${per.map((p, i) => `<div><div class="col ${days[i] === todayK ? 'today' : ''}" style="height:${p.tot / nice * 100}%;animation-delay:${i * 25}ms" data-tip="${AO.tip(`<b>${AO.usd(p.tot)}</b>${days[i].slice(8)}/${days[i].slice(5, 7)}${days[i] === todayK ? (AO.lang === 'en' ? ' · in progress' : ' · đang diễn ra') : ''}<br>${t('t.cr')} ${AO.usd(p.cr)} · ${t('t.cw')} ${AO.usd(p.cw)} · ${t('t.out')} ${AO.usd(p.out)}`)}">
+    <i style="flex:${p.cr};background:color-mix(in srgb, var(--gold) 40%, transparent)"></i><i style="flex:${p.cw};background:var(--gold)"></i><i style="flex:${p.out};background:var(--txt)"></i></div></div>`).join('')}</div>
+  <div class="bax">${days.map((d, i) => `<span>${i % step ? '' : d.slice(8) + '/' + d.slice(5, 7)}</span>`).join('')}</div>
+  <div class="legend"><span><i style="background:color-mix(in srgb, var(--gold) 40%, transparent)"></i>${t('t.cr')}</span><span><i style="background:var(--gold)"></i>${t('t.cw')}</span><span><i style="background:var(--txt)"></i>${t('t.out')}</span><span><i style="background:none;outline:1px dashed var(--gold)"></i>${t('range.today')}</span></div></section>`;
+
+// where it goes
+const tot = cur.cr + cur.cw + cur.out + cur.in || 1;
+h += `<section class="panel"><div class="ph"><h3>${t('p.where')}</h3><span class="r">${AO.usd(cur.cost)}</span></div>
+  <div class="tbar" style="height:10px"><i style="flex:${cur.cr};background:color-mix(in srgb, var(--gold) 40%, transparent)"></i><i style="flex:${cur.cw};background:var(--gold)"></i><i style="flex:${cur.out};background:var(--txt)"></i></div>
+  <div class="kv">
+    <span><i class="sw" style="background:color-mix(in srgb, var(--gold) 40%, transparent)"></i>${t('t.cr')}</span><span class="r num dim">${AO.pct(cur.cr / tot, 0)}</span><span class="r num">${AO.usd(cur.cr)}</span>
+    <span><i class="sw" style="background:var(--gold)"></i>${t('t.cw')}</span><span class="r num dim">${AO.pct(cur.cw / tot, 0)}</span><span class="r num">${AO.usd(cur.cw)}</span>
+    <span><i class="sw" style="background:var(--txt)"></i>${t('t.out')}</span><span class="r num dim">${AO.pct(cur.out / tot, 0)}</span><span class="r num">${AO.usd(cur.out)}</span>
+    <span><i class="sw" style="background:var(--hair2)"></i>${t('t.in')}</span><span class="r num dim">${AO.pct(cur.in / tot)}</span><span class="r num">${AO.usd(cur.in)}</span>
+  </div>
+  <div class="ph" style="margin-top:20px"><h3>Model</h3><span class="r">${t('k.tokens')} · ${t('k.cost')}</span></div>
+  <div class="kv" style="margin-top:0">${Object.entries(byModel).sort((a, b) => b[1].tok - a[1].tok).map(([m, v]) => `<span>${AO.esc(AO.model(m))}</span><span class="r num dim">${AO.tok(v.tok)}</span><span class="r num">${priced(m) ? AO.usd(v.cost) : `<span class="faint" data-tip="${AO.tip(AO.lang === 'en' ? 'No price in the table — tokens are counted, cost is not.' : 'Chưa có giá trong bảng — đếm token, không tính tiền.')}">— ⓘ</span>`}</span>`).join('')}</div>
+</section></div>`;
+
+// costliest sessions + price table + budget
+const topS = [...list].sort((a, b) => b.cost - a.cost).slice(0, 10), mx = Math.max(...topS.map(s => s.cost), 1);
+const month = AO.dayKey(NOW).slice(0, 7), monthCost = AO.D.sessions.reduce((a, s) => a + Object.entries(s.byDay).filter(([d]) => d.startsWith(month)).reduce((b, [, v]) => b + v.in + v.out + v.cw + v.cr, 0), 0);
+const budget = AO.D.config.budget, dom = +AO.dayKey(NOW).slice(8), dim = new Date(+month.slice(0, 4), +month.slice(5, 7), 0).getDate(), proj = monthCost / dom * dim;
+h += `<div class="g2"><section class="panel"><div class="ph"><h3>${t('p.top')}</h3><span class="r"><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--gold)"></i> ${t('r.main')} &nbsp;<i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--worker)"></i> ${t('k.subagents').toLowerCase()}</span></div>
+  <div style="overflow-x:auto"><table><thead><tr><th>${t('c.session')}</th><th>${t('c.date')}</th><th class="r">${t('p.agents')}</th><th>${t('k.cost')}</th><th class="r">${t('k.tokens')}</th><th class="r">$/h</th></tr></thead><tbody>
+  ${topS.map(s => `<tr class="click" onclick="location.href='/session.html?id=${encodeURIComponent(s.id)}'"><td><span class="ttl" title="${AO.esc(s.title)}">${AO.esc(s.title)}<em class="mono">${AO.esc(s.short)} · ${AO.esc(s.project)}</em></span></td><td class="dim">${AO.date(s.t0)}</td>
+    <td class="r">${s.agents.length > 1 ? `1 + <span style="color:var(--worker)">${s.agents.length - 1}</span>` : '<span class="dim">1</span>'}</td>
+    <td><div style="display:flex;align-items:center;gap:8px"><div class="tbar" style="width:${Math.max(6, s.cost / mx * 160)}px"><i style="flex:${s.cost - s.subCost};background:var(--gold)"></i><i style="flex:${s.subCost};background:var(--worker)"></i></div><span class="num">${AO.usd(s.cost)}</span></div></td>
+    <td class="r dim">${AO.tok(s.tokTotal)}</td><td class="r dim">${AO.usd(s.cost / Math.max((s.t1 - s.t0) / 3600e3, .25))}</td></tr>`).join('')}
+  </tbody></table></div></section>
+  <div class="grid">
+  <section class="panel"><div class="ph"><h3>${t('p.price')}</h3><span class="r">$ / 1M</span></div>
+    <table class="price"><thead><tr><th>Model</th><th class="r">${t('t.in')}</th><th class="r">${t('t.out')}</th><th class="r">${t('t.cw')}</th><th class="r">${t('t.cr')}</th></tr></thead><tbody>
+    ${tableModels.map(m => `<tr><td class="${priced(m) ? '' : 'dim'}">${AO.esc(AO.model(m))}</td>${KEYS.map(k => `<td class="r"><input type="number" step="0.01" min="0" data-m="${AO.esc(m)}" data-k="${k}" ${Number.isFinite(P[m] && P[m][k]) ? `value="${P[m][k]}"` : 'placeholder="—"'} aria-label="${AO.esc(m)} ${k}"></td>`).join('')}</tr>`).join('')}
+    </tbody></table>
+    <div class="faint" style="font-size:11.5px;margin-top:6px" data-tip="${AO.tip(AO.lang === 'en' ? 'Claude Code uses the 1-hour cache: writes cost 2× input.' : 'Claude Code dùng cache 1 giờ: ghi cache = 2× giá input.')}">${t('t.cw')} = 1h · 2× ${t('t.in')} ⓘ</div></section>
+  <section class="panel"><div class="ph"><h3>${t('p.budget')}</h3><span class="r">${month.slice(5)}/${month.slice(0, 4)}</span></div>
+    ${budget == null ? `<div style="display:flex;align-items:baseline;gap:10px"><span style="font-size:26px;font-weight:300" class="num">${AO.usd(monthCost, 0)}</span><button class="bset" id="budSet">${AO.lang === 'en' ? 'Set budget' : 'Đặt ngân sách'}</button></div>`
+    : `<div style="display:flex;align-items:baseline;gap:10px"><span style="font-size:26px;font-weight:300" class="num">${AO.usd(monthCost, 0)}</span><span class="dim">/ <span class="bedit num" id="budEdit" role="button" tabindex="0">${AO.usd(budget, 0)}</span></span>
+      <span class="ml ${proj > budget ? 'flag bad' : 'dim'}" data-tip="${AO.tip(AO.lang === 'en' ? 'Straight-line projection from month-to-date.' : 'Dự kiến theo tốc độ từ đầu tháng.')}">${AO.lang === 'en' ? 'projected' : 'dự kiến'} ${AO.usd(proj, 0)}</span></div>
+    <div class="bullet" style="margin:12px 0 6px;height:8px"><i style="width:${budget ? Math.min(100, monthCost / budget * 100) : 0}%;background:${budget && monthCost / budget > .8 ? 'var(--bad)' : 'var(--gold)'}"></i><b style="left:80%"></b><b style="left:${budget ? Math.min(99.5, proj / budget * 100) : 0}%;background:var(--warn);opacity:.8"></b></div>
+    <div style="display:flex;justify-content:space-between;font-size:11.5px" class="faint"><span>${budget ? AO.pct(monthCost / budget, 0) : '—'}</span><span>80%</span></div>`}
+  </section>
+  </div></div>`;
+app.innerHTML = AO.header('cost') + h;
+AO.init();
+bind();
+});
+</script>
+</body>
+</html>

@@ -7,7 +7,7 @@ export const DEFAULT_PRICES = {
 
 export function costOf(model, usage, prices = DEFAULT_PRICES) {
   const p = prices && prices[model];
-  if (!p) return null;
+  if (!p || !['in', 'out', 'cw', 'cr'].every((k) => Number.isFinite(p[k]))) return null;
   const u = usage || {};
   return ((u.in || 0) * p.in + (u.out || 0) * p.out + (u.cw || 0) * p.cw + (u.cr || 0) * p.cr) / 1e6;
 }

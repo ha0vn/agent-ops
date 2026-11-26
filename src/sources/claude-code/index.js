@@ -3,7 +3,7 @@ import path from 'node:path';
 import { claudeProjectsDir } from '../../paths.js';
 import { DEFAULT_CONFIG } from '../../config.js';
 import { openCursor, readNew as defaultReadNew } from './reader.js';
-import { createAgent, applyRecord, agentSummary } from './agent.js';
+import { createAgent, applyRecord, agentSummary, repriceAgent } from './agent.js';
 import { buildSession, sessionStatus, agentStatus } from './session.js';
 
 const statOf = (f) => { try { return fs.statSync(f); } catch { return null; } };
@@ -33,6 +33,13 @@ class ClaudeCodeScanner {
     e.size = st.size;
     this.files.set(file, e);
     return true;
+  }
+
+  // New prices/thresholds: recompute costs from cached agent state, rebuild sessions on next refresh (stat only).
+  setConfig(cfg) {
+    this.cfg = cfg;
+    for (const e of this.files.values()) { repriceAgent(e.state, cfg.prices); e.summary = null; }
+    this.sess.clear();
   }
 
   _summary(file) {
