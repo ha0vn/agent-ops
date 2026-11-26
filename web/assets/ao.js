@@ -79,16 +79,20 @@
 
   AO.role = a => a.key === 'main' ? 'main' : /^R\d|review/i.test(a.label + ' ' + (a.desc || '')) ? 'review' : 'worker';
   AO.color = a => ({ main: 'var(--gold)', worker: 'var(--worker)', review: 'var(--review)' })[AO.role(a)];
-  AO.status = st => `<span class="st ${st}"><i></i>${AO.t('st.' + st)}</span>`;
+  AO.status = st => `<span class="st ${AO.esc(st)}"><i></i>${AO.esc(AO.t('st.' + st))}</span>`;
   AO.problems = s => { const out = [], th = AO.D.config.thresholds || {}, rate = s.calls ? s.errs / s.calls : 0;
     if (s.t1 - s.t0 > (th.longSessionHours ?? 8) * 3600e3) out.push(['warn', AO.dur(s.t1 - s.t0)]);
     if (s.tokTotal > (th.bigSessionTokens ?? 150e6)) out.push(['warn', AO.tok(s.tokTotal)]);
     if (s.errs > (th.errCount ?? 20) && rate > (th.errRate ?? .03)) out.push(['bad', s.errs + ' · ' + AO.pct(rate)]);
     if (s.overlaps?.length) out.push(['warn', AO.t('x.overlap')]);
     return out; };
+  // Tooltip content is HTML (shown via innerHTML) carried in a data-tip attribute. RULE: html passed here must already be escaped
+  // (AO.esc every data-derived piece); this only attribute-encodes it, so one decode by dataset yields safe HTML.
+  AO.tip = html => AO.esc(html);
+  AO.checkSource = () => { const ok = AO.D.sources.some(x => x.available && x.id === AO.sourceFilter); if (AO.sourceFilter && !ok) { AO.sourceFilter = ''; ls.set('aoSource', ''); } };
   AO.sourceOf = s => AO.D.sources.find(x => x.id === s.source);
   AO.sourceBadge = s => { const src = AO.sourceOf(s); if (!src) return ''; const label = src.label || src.id || '?';
-    return `<span class="srcb" style="background:${AO.esc(src.color || 'var(--faint)')}" data-tip="${AO.esc(label)}">${AO.esc(label.charAt(0).toUpperCase())}</span>`; };
+    return `<span class="srcb" style="background:${AO.esc(src.color || 'var(--faint)')}" data-tip="${AO.tip(AO.esc(label))}">${AO.esc(label.charAt(0).toUpperCase())}</span>`; };
 
   // header
   AO.header = active => {
@@ -107,6 +111,7 @@
     </header>`;
   };
   // connection indicator; live.js calls it on every state change
+  AO.hideTip = () => { const t = document.getElementById('tip'); if (t) t.classList.remove('on'); };
   AO.setConn = () => { const el = document.getElementById('conn'); if (!el) return; const on = AO.state !== 'error';
     el.classList.toggle('on', on); el.querySelector('.cl').textContent = AO.t(on ? 'x.live' : 'x.offline'); el.querySelector('.ct').textContent = AO.D.generatedAt ? AO.time(AO.D.generatedAt) : ''; };
   // idempotent: pages call it after every render (new header buttons are re-bound; global listeners added once)
@@ -132,7 +137,7 @@
     document.addEventListener('click', e => { const b = e.target.closest('[data-resume]'); if (!b) return; e.stopPropagation(); e.preventDefault();
       const cmd = 'claude --resume ' + b.dataset.resume; (navigator.clipboard ? navigator.clipboard.writeText(cmd) : Promise.reject()).catch(() => {}); AO.toast(AO.t('a.copied') + ': ' + cmd); });
   };
-  AO.resumeBtn = (s, primary) => `<button class="act ${primary ? 'primary' : ''}" data-resume="${s.id}" data-tip="claude --resume ${s.short}…">⧉ ${AO.t('a.resume')}</button>`;
+  AO.resumeBtn = (s, primary) => `<button class="act ${primary ? 'primary' : ''}" data-resume="${AO.esc(s.id)}" data-tip="${AO.tip('claude --resume ' + AO.esc(s.short) + '…')}">⧉ ${AO.t('a.resume')}</button>`;
   AO.banner = () => AO.state === 'error' ? `<div class="banner">⚠ ${AO.t('err.banner')}</div>` : AO.state === 'loading' ? `<div class="banner stale">⟳ ${AO.t('stale.banner')}</div>` : '';
   AO.list = (w) => AO.state === 'empty' ? [] : AO.sessions(w);
   AO.emptyState = () => `<div class="empty-state"><div class="big">∅</div><b>${AO.t('empty.title')}</b><span>${AO.t('empty.body')}</span></div>`;
@@ -155,8 +160,8 @@
         const rr = rad(a), on = a.status === 'run';
         edges += `<line x1="${C}" y1="${C}" x2="${x}" y2="${y}" stroke="${col}" stroke-opacity="${on ? .55 : .2}"/>`;
         if (on) packets += `<circle r="${o.mini ? 1.6 : 2.2}" fill="${col}"><animateMotion dur="3.2s" repeatCount="indefinite" path="M${x} ${y} L${C} ${C}"/><animate attributeName="opacity" values="0;1;1;0" dur="3.2s" repeatCount="indefinite"/></circle>`;
-        const tip = `<b>${AO.esc(a.label)}</b>${AO.esc(a.desc || '')}<br>${AO.model(a.model)} · ${AO.tok(a.tok.cr + a.tok.cw + a.tok.out + a.tok.in)} · ${AO.usd(a.cost)}<br>${AO.t('st.' + a.status)}`;
-        nodes += `<g data-tip="${AO.esc(tip)}"><circle cx="${x}" cy="${y}" r="${rr}" fill="var(--bg-hi)" stroke="${col}" stroke-opacity="${a.status === 'done' || a.status === 'stop' ? .55 : .95}"/>` +
+        const tip = `<b>${AO.esc(a.label)}</b>${AO.esc(a.desc || '')}<br>${AO.esc(AO.model(a.model))} · ${AO.tok(a.tok.cr + a.tok.cw + a.tok.out + a.tok.in)} · ${AO.usd(a.cost)}<br>${AO.esc(AO.t('st.' + a.status))}`;
+        nodes += `<g data-tip="${AO.tip(tip)}"><circle cx="${x}" cy="${y}" r="${rr}" fill="var(--bg-hi)" stroke="${col}" stroke-opacity="${a.status === 'done' || a.status === 'stop' ? .55 : .95}"/>` +
           (on ? `<circle cx="${x}" cy="${y}" r="${rr + 5}" fill="none" stroke="${col}" stroke-width="1.2" stroke-dasharray="${rr} ${rr * 6}" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 ${x} ${y}" to="360 ${x} ${y}" dur="5s" repeatCount="indefinite"/></circle>` : '') + `</g>`;
         if (!o.mini) labels += `<text x="${x}" y="${y + (y >= C ? rr + (o.mini ? 10 : 14) : -rr - (o.mini ? 5 : 8))}" text-anchor="middle" font-size="${o.mini ? 8 : 11}" fill="var(--dim)">${AO.esc(a.label)}</text>`;
       });
@@ -169,7 +174,7 @@
       <circle cx="${C}" cy="${C}" r="${R1 + 8}" fill="none" stroke="var(--txt)" stroke-opacity=".05" stroke-dasharray="1 6"/>
       ${edges}${packets}
       <circle cx="${C}" cy="${C}" r="${cr * 1.8}" fill="${cc}" opacity=".07"><animate attributeName="r" values="${cr * 1.5};${cr * 1.9};${cr * 1.5}" dur="6s" repeatCount="indefinite"/></circle>
-      <g data-tip="${AO.esc(`<b>${AO.t('r.main')}</b>${AO.model(main.model)} · ${AO.tok(main.ctx)} ${AO.t('k.context').toLowerCase()}`)}"><circle cx="${C}" cy="${C}" r="${cr}" fill="var(--bg-hi)" stroke="${cc}" stroke-opacity=".75"/>
+      <g data-tip="${AO.tip(`<b>${AO.t('r.main')}</b>${AO.esc(AO.model(main.model))} · ${AO.tok(main.ctx)} ${AO.t('k.context').toLowerCase()}`)}"><circle cx="${C}" cy="${C}" r="${cr}" fill="var(--bg-hi)" stroke="${cc}" stroke-opacity=".75"/>
       <text x="${C}" y="${C - (o.mini ? 1 : 3)}" text-anchor="middle" font-size="${o.mini ? 7 : 9}" letter-spacing="2" fill="var(--dim)">${subs.length ? subs.length + ' ' + (AO.lang === 'en' ? 'SUB' : 'CON') : (AO.lang === 'en' ? 'SOLO' : 'ĐƠN')}</text>
       <text x="${C}" y="${C + (o.mini ? 9 : 14)}" text-anchor="middle" font-size="${o.mini ? 9.5 : 14}" font-weight="300" fill="var(--txt)">${AO.tok(main.ctx)}</text></g>
       ${nodes}${labels}</svg>`;

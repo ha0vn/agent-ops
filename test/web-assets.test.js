@@ -70,3 +70,67 @@ test('every i18n key used in web/*.html exists', () => {
   for (const k of keys) assert.notEqual(AO.t(k), k, `missing i18n key ${k}`);
   assert.ok(existsSync(new URL('../web/assets/live.js', import.meta.url)));
 });
+
+const decodeOnce = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+const unsafe = (s) => /<img|<script/i.test(s);
+
+test('log-derived strings are escaped in tooltips and attributes (even after one decode)', () => {
+  const AO = load('vi');
+  const evil = '<img src=x onerror=alert(1)>';
+  AO.D = { generatedAt: 1, sources: [{ id: 's', label: evil, color: '#fff', available: true }], sessions: [], config: {} };
+  const tok = { in: 1, out: 1, cw: 1, cr: 1 };
+  const s = { id: '"><script>', short: '"><script>', status: 'run', agents: [
+    { key: 'main', label: evil, desc: evil, model: evil, status: '<script>', tok, ctx: 5, cost: 1 },
+    { key: 'a1', label: evil, desc: evil, model: evil, status: '<script>', tok, ctx: 5, cost: 1 }] };
+  const outs = [AO.orbit(s), AO.resumeBtn(s, true), AO.sourceBadge({ source: 's' }), AO.status('<script>')];
+  for (const h of outs) {
+    assert.ok(!unsafe(h), 'raw: ' + h.slice(0, 200));
+    for (const m of h.matchAll(/data-tip="([^"]*)"/g)) assert.ok(!unsafe(decodeOnce(m[1])), 'decoded tip: ' + decodeOnce(m[1]).slice(0, 200));
+  }
+});
+
+test('stale aoSource is reset when not an available source', () => {
+  const AO = load('vi', { aoSource: 'gone' });
+  assert.equal(AO.sourceFilter, 'gone');
+  AO.D = { sources: [{ id: 'a', available: true }], sessions: [], config: {} };
+  AO.checkSource();
+  assert.equal(AO.sourceFilter, '');
+});
+
+test('AO.live: initial render, debounced refetch, error then recovery', async () => {
+  const timers = [];
+  let fetches = 0, fail = false, es;
+  const data = () => ({ generatedAt: Date.now(), sources: [], sessions: [], config: {} });
+  const AO = load('vi', {});
+  const ctx = {
+    window: { AO, scrollY: 40, scrollTo(x, y) { ctx.scrolled = y; } },
+    location: { search: "" }, console, URLSearchParams,
+    setTimeout: (f, ms) => { const t = { f, ms, off: false }; timers.push(t); return t; },
+    clearTimeout: (t) => { if (t) t.off = true; },
+    fetch: async () => { fetches++; if (fail) throw new Error('down'); return { ok: true, json: async () => data() }; },
+    EventSource: class { constructor(u) { this.u = u; this.l = {}; es = this; } addEventListener(n, f) { this.l[n] = f; } },
+    document: { getElementById: () => null },
+  };
+  ctx.globalThis = ctx;
+  AO.setConn = () => {}; AO.hideTip = () => {};
+  vm.createContext(ctx);
+  vm.runInContext(read('assets/live.js'), ctx);
+  let renders = 0;
+  AO.live(() => { renders++; });
+  await new Promise((r) => setImmediate(r));
+  assert.equal(renders, 1); assert.equal(fetches, 1); assert.equal(es.u, '/events'); assert.equal(ctx.scrolled, 40);
+  es.l.change(); es.l.change();
+  const live = () => timers.filter((t) => !t.off && t.ms === 800);
+  assert.equal(live().length, 1);
+  live()[0].f();
+  await new Promise((r) => setImmediate(r));
+  assert.equal(fetches, 2); assert.equal(renders, 2);
+  fail = true; AO.reload();
+  await new Promise((r) => setImmediate(r));
+  assert.equal(AO.state, 'error');
+  assert.ok(timers.some((t) => !t.off && t.ms === 5000));
+  fail = false; timers.filter((t) => !t.off && t.ms === 5000)[0].f();
+  await new Promise((r) => setImmediate(r));
+  assert.notEqual(AO.state, 'error');
+  assert.equal(renders, 4);
+});

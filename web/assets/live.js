@@ -14,7 +14,8 @@
   function paint() {
     if (!renderFn) return;
     const y = window.scrollY;
-    try { renderFn(AO.D); } catch (e) { if (e !== 0) console.error(e); }
+    AO.hideTip();
+    try { renderFn(AO.D); } catch (e) { console.error(e); }
     window.scrollTo(0, y);
     AO.setConn();
   }
@@ -26,7 +27,7 @@
       const r = await fetch('/api/data', { cache: 'no-store' });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const data = await r.json();
-      AO.D = data; AO.NOW = Date.now();
+      AO.D = data; AO.NOW = Date.now(); AO.checkSource();
       clearTimeout(retry); retry = null;
       setError(false);
       paint();
