@@ -1,4 +1,5 @@
 ---
+allowed-tools: Bash(node:*)
 description: Open the Agent Ops dashboard (local, read-only view of Claude Code sessions)
 ---
 

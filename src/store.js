@@ -44,7 +44,9 @@ export class Store extends EventEmitter {
     this.env = env;
     this.stateDir = stateDir;
     this.config = config || loadConfig(stateDir);
-    this.scanners = new Map(SOURCES.filter((s) => s.detect(env)).map((s) => [s.id, s.createScanner(env, this.config, { readNew })]));
+    this.readNew = readNew;
+    this.scanners = new Map();
+    this._syncScanners();
     this.history = new Map();
     this.refreshed = false;
     this.sources = listSources(env);
@@ -52,6 +54,13 @@ export class Store extends EventEmitter {
       const arr = JSON.parse(fs.readFileSync(this._histFile(), 'utf8'));
       if (Array.isArray(arr)) for (const s of arr) if (s && s.id) this.history.set(s.id, s);
     } catch { /* no history yet */ }
+  }
+
+  // Create a scanner for every source that is detected now but has none yet (e.g. its log dir appeared after start).
+  _syncScanners() {
+    for (const s of SOURCES) {
+      if (!this.scanners.has(s.id) && s.detect(this.env)) this.scanners.set(s.id, s.createScanner(this.env, this.config, { readNew: this.readNew }));
+    }
   }
 
   // Apply a new config: scanners reprice from cached state; changed sessions are re-emitted.
@@ -73,6 +82,7 @@ export class Store extends EventEmitter {
 
   refresh(now = Date.now()) {
     const changed = [];
+    this._syncScanners();
     for (const sc of this.scanners.values()) {
       const r = sc.refresh(now);
       const ids = new Set(r.changed);

@@ -158,7 +158,7 @@ function refreshData() {
 
 function groupsAll() { MAXTOK = Math.max(1, ...pool.flatMap(s => s.agents.slice(1).map(tokOf)));
   const center = { key: 'you', html: nodeHtml('you', L('Bạn', 'You'), `${pool.length} ${L('phiên đang mở', 'open sessions')}`, ROLE.you, false, true),
-    panel: activityHtml(pool.flatMap(s => s.events.slice(0, 2).map(e => ({ ...e, who: short(s.title, 14), kindLabel: '' }))).sort((a, b) => b.ts - a.ts), ROLE.main, pool.reduce((x, s) => x + s.events.length, 0)) };
+    panel: activityHtml(pool.flatMap(s => s.events.slice(0, 2).map(e => ({ ...e, who: short(AO.title(s), 14), kindLabel: '' }))).sort((a, b) => b.ts - a.ts), ROLE.main, pool.reduce((x, s) => x + s.events.length, 0)) };
   const nodes = pool.map(s => { const subs = s.agents.slice(1), sc = s.status === 'wait' ? COL.rev : s.status === 'run' ? COL.prog : COL.done;
     const byCol = { prog: [], rev: [], done: [] };
     for (const a of subs) { const st = agentStatus(a), c = st === 'bad' ? COL.bad : st === 'prog' ? COL.prog : AO.role(a) === 'review' && a.status !== 'done' ? COL.rev : COL.done;
@@ -168,14 +168,14 @@ function groupsAll() { MAXTOK = Math.max(1, ...pool.flatMap(s => s.agents.slice(
                          column(L('File', 'Files'), COL.done, s.files.filter(f => f.ops.W || f.ops.E).slice(0, 2).map(f => card(f.name, f.dir, f.ops.W ? COL.done : COL.prog, f.ops.W ? 'W' : 'E', null, false, s.id)))]
       : [column(L('Đang làm', 'In progress'), COL.prog, byCol.prog.slice(0, 2)), column('Review', COL.rev, byCol.rev.slice(0, 2)), column(L('Xong', 'Done'), COL.done, byCol.done.slice(-2))];
     return { key: s.id, session: s, gname: s.project, lensCol: lensFor(s.agents[0], sc), run: s.status !== 'stop', col: s.status === 'wait' ? '#ffb27a' : s.status === 'run' ? '#7fe0a8' : '#e4c590', edge: sc,
-      html: nodeHtml(s.id, short(s.title, 30), `${s.project} · ${AO.model(s.agents[0].model)} · ${t('st.' + s.status)}`, s.status === 'wait' ? '#ffb27a' : s.status === 'run' ? '#7fe0a8' : '#e4c590', s.status !== 'stop', false, AO.sourceBadge(s)),
+      html: nodeHtml(s.id, short(AO.title(s), 30), `${s.project} · ${AO.model(s.agents[0].model)} · ${t('st.' + s.status)}`, s.status === 'wait' ? '#ffb27a' : s.status === 'run' ? '#7fe0a8' : '#e4c590', s.status !== 'stop', false, AO.sourceBadge(s)),
       panel: activityHtml(s.events.map(e => ({ ...e, who: e.agent === 'main' ? L('chính', 'main') : e.agent })), ROLE.main, s.events.length) + cols.join('') }; });
   return { center, nodes };
 }
 function groupsSession(s) {
   const main = s.agents[0], subs = s.agents.slice(1); MAXTOK = Math.max(1, ...subs.map(tokOf));
   const shown = subs.length > 8 ? [...subs].sort((a, b) => b.t1 - a.t1).slice(0, 7) : subs, more = subs.length - shown.length;
-  const center = { key: 'main', gname: L('điều phối', 'orchestrator'), html: nodeHtml(s.id, short(s.title, 34), `${L('agent chính', 'main agent')} · ${AO.model(main.model)} · ${t('st.' + s.status)}`, ROLE.main, s.status !== 'stop', true),
+  const center = { key: 'main', gname: L('điều phối', 'orchestrator'), html: nodeHtml(s.id, short(AO.title(s), 34), `${L('agent chính', 'main agent')} · ${AO.model(main.model)} · ${t('st.' + s.status)}`, ROLE.main, s.status !== 'stop', true),
     panel: activityHtml(main.recent.map(e => ({ ...e, who: '', kindLabel: '' })), ROLE.main, main.calls) +
       column(L('Skill', 'Skills'), ROLE.main, s.phases.slice(-3).reverse().map((p, i) => card(p.skill.replace(/^[^:]+:/, ''), `${AO.time(p.from)} · ${p.calls} ${L('lệnh', 'calls')}`, i === 0 && s.status !== 'stop' ? COL.prog : '#e4c590', p.spawns ? '➤' + p.spawns : null))) +
       column(L('Giao việc', 'Delegated'), ROLE.worker, s.spawns.slice(-3).reverse().map(p => { const a = subs.find(x => x.desc === p.desc); return card(p.desc || 'agent', `${a ? a.label : ''} · ${p.model || ''} · ${AO.time(p.ts)}`, a ? (agentStatus(a) === 'prog' ? COL.prog : agentStatus(a) === 'bad' ? COL.bad : COL.done) : COL.todo, null); })) };
@@ -232,8 +232,8 @@ function draw(refit) {
     if (layout === 'columns') { const mx = (cx + x) / 2; d = `M${cx + O} ${cy + O} C${mx + O} ${cy + O} ${mx + O} ${y + O} ${x + O} ${y + O}`; }
     else { const mx = (cx + x) / 2 + (y - cy) * .18, my = (cy + y) / 2 - (x - cx) * .18; d = `M${cx + O} ${cy + O} Q${mx + O} ${my + O} ${x + O} ${y + O}`; }
     const ec = lens === 'status' ? 'rgba(120,150,255,.3)' : g.lensCol || 'rgba(120,150,255,.3)';
-    s += `<path data-k="${g.key}" d="${d}" fill="none" stroke="${ec}" stroke-opacity="${lens === 'status' ? 1 : .55}" stroke-width="1.4"/>`;
-    if (g.run) s += `<path data-k="${g.key}" d="${d}" fill="none" stroke="${g.col}" stroke-width="1.6" stroke-dasharray="6 14" opacity=".9"><animate attributeName="stroke-dashoffset" from="40" to="0" dur="1.4s" repeatCount="indefinite"/></path><circle data-k="${g.key}" r="3" fill="${g.col}"><animateMotion dur="2.6s" repeatCount="indefinite" path="${d}"/></circle>`; }
+    s += `<path data-k="${esc(g.key)}" d="${d}" fill="none" stroke="${ec}" stroke-opacity="${lens === 'status' ? 1 : .55}" stroke-width="1.4"/>`;
+    if (g.run) s += `<path data-k="${esc(g.key)}" d="${d}" fill="none" stroke="${g.col}" stroke-width="1.6" stroke-dasharray="6 14" opacity=".9"><animate attributeName="stroke-dashoffset" from="40" to="0" dur="1.4s" repeatCount="indefinite"/></path><circle data-k="${esc(g.key)}" r="3" fill="${g.col}"><animateMotion dur="2.6s" repeatCount="indefinite" path="${d}"/></circle>`; }
   for (const [a, b] of (G.pairs || [])) { const A = G.nodes.find(g => g.key === a), B = G.nodes.find(g => g.key === b); if (!A || !B) continue; const [x1, y1] = av(A), [x2, y2] = av(B);
     s += `<path d="M${x1 + O} ${y1 + O} Q${(x1 + x2) / 2 + O} ${Math.min(y1, y2) - 120 + O} ${x2 + O} ${y2 + O}" fill="none" stroke="rgba(143,208,255,.45)" stroke-width="1.2" stroke-dasharray="3 5"/>
       <text x="${(x1 + x2) / 2 + O}" y="${Math.min(y1, y2) - 66 + O}" fill="#8fd0ff" font-family="IBM Plex Mono" font-size="11" text-anchor="middle">review</text>`; }
@@ -244,7 +244,7 @@ function draw(refit) {
   G.center.el.querySelector('.node').onclick = e => { e.stopPropagation(); if (mode === 'session') go(null); };
   // hover: focus a group and its link
   const W2 = document.getElementById('world');
-  [G.center, ...G.nodes].forEach(g => { g.el.onmouseenter = () => { W2.classList.add('focus'); g.el.classList.add('hl'); G.center.el.classList.add('hl'); svg.querySelectorAll(`[data-k="${g.key}"]`).forEach(p => p.classList.add('hl')); if (g === G.center) W2.querySelectorAll('.grp').forEach(x => x.classList.add('hl')); };
+  [G.center, ...G.nodes].forEach(g => { g.el.onmouseenter = () => { W2.classList.add('focus'); g.el.classList.add('hl'); G.center.el.classList.add('hl'); svg.querySelectorAll(`[data-k="${CSS.escape(String(g.key))}"]`).forEach(p => p.classList.add('hl')); if (g === G.center) W2.querySelectorAll('.grp').forEach(x => x.classList.add('hl')); };
     g.el.onmouseleave = () => { W2.classList.remove('focus'); W2.querySelectorAll('.hl').forEach(x => x.classList.remove('hl')); svg.querySelectorAll('.hl').forEach(x => x.classList.remove('hl')); }; });
   bar(); tools2();
   if (refit) fit(); else apply();
@@ -264,7 +264,7 @@ function tools2() {
 }
 function go(id) { setQ('s', id ? id.slice(0, 8) : ''); refreshData(); render.sig = mode + (cur ? cur.id : ''); draw(true); }
 function bar() {
-  const opts = AO.sessions([0, Infinity]).slice(0, 40).map(s => `<option value="${esc(s.id)}" ${cur && cur.id === s.id ? 'selected' : ''}>${esc(short(s.title, 48))} · ${t('st.' + s.status)}</option>`).join('');
+  const opts = AO.sessions([0, Infinity]).slice(0, 40).map(s => `<option value="${esc(s.id)}" ${cur && cur.id === s.id ? 'selected' : ''}>${esc(short(AO.title(s), 48))} · ${t('st.' + s.status)}</option>`).join('');
   document.getElementById('bar').innerHTML = `<span class="tab ${mode === 'all' ? 'on' : ''}" id="tAll">👥 ${L('Tất cả', 'All')} · ${pool.length}</span>
     <span class="tab ${mode === 'session' ? 'on' : ''}">🛰 <select id="sel"><option value="">${L('Chọn phiên…', 'Pick a session…')}</option>${opts}</select></span>
     ${mode === 'session' ? `<span class="tab on" style="cursor:default">⎇ ${L('Sơ đồ', 'Graph')} · ${cur.agents.length} agent</span><a class="tab" href="/session.html?id=${encodeURIComponent(cur.id)}">${t('a.open')} ↗</a>${AO.resumeBtn(cur, cur.status === 'wait').replace('class="act', 'class="tab')}` : ''}`;

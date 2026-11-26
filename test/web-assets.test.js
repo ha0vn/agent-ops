@@ -162,3 +162,21 @@ test('skills and cost pages follow the live-page contract', () => {
   }
   assert.match(read('cost.html'), /type="number" step="0\.01"/);
 });
+
+test('no web page loads anything from an external url', () => {
+  const files = readdirSync(new URL('../web/', import.meta.url)).filter((f) => f.endsWith('.html'));
+  assert.ok(files.length >= 6);
+  for (const f of files) assert.ok(!/https?:\/\//.test(read(f)), f + ' has an external url');
+});
+
+test('AO.niceMax and AO.title helpers', () => {
+  const AO = load('en');
+  assert.equal(AO.niceMax(0.3), 0.5);
+  assert.equal(AO.niceMax(3.2), 5);
+  assert.equal(AO.niceMax(51), 100);
+  assert.equal(AO.niceMax(120), 200);
+  assert.equal(AO.niceMax(200), 200);
+  assert.equal(AO.title({ title: null }), '(untitled)');
+  assert.equal(AO.title({ title: 'Hi' }), 'Hi');
+  assert.equal(load('vi').title({ title: '' }), '(chưa đặt tên)');
+});

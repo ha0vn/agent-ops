@@ -89,18 +89,18 @@ function render(D) {
 
   let h = AO.banner();
   h += `<div class="shead"><div style="min-width:0"><div class="eyebrow"><a href="/">← ${t('nav.sessions')}</a></div>
-  <h1>${AO.esc(S.title)}</h1><div class="meta"><span class="mono">${AO.esc(S.short)}</span> · ${AO.esc(S.project)} · ${AO.esc(S.entry || '')} · ${AO.dt(S.t0)} → ${AO.time(S.t1)} · ${AO.dur(S.t1 - S.t0)}</div></div>
+  <h1>${AO.esc(AO.title(S))}</h1><div class="meta"><span class="mono">${AO.esc(S.short)}</span> · ${AO.esc(S.project)} · ${AO.esc(S.entry || '')} · ${AO.dt(S.t0)} → ${AO.time(S.t1)} · ${AO.dur(S.t1 - S.t0)}</div></div>
   <div class="ml" style="display:flex;gap:8px;align-items:center">${AO.status(S.status)}${S.logDeleted ? `<span class="chip">${t('x.logDeleted')}</span>` : AO.resumeBtn(S, S.status === 'wait')}
   <div class="seg" id="viewSeg"><button data-v="compact" class="${mode === 'compact' ? 'on' : ''}">${t('v.compact')}</button><button data-v="detail" class="${mode === 'detail' ? 'on' : ''}">${t('v.detail')}</button></div></div></div>`;
 
-  const ctxPct = main.ctx / 1e6;
+  const ctxPct = main.ctx / AO.ctxWindow();
   h += `<div class="strip" style="--n:${mode === 'detail' ? 8 : 6}">
   <div><div class="eyebrow">${t('k.tokens')}</div><div class="v">${AO.tok(S.tokTotal)}</div><div class="d">${t('k.cache').toLowerCase()} ${AO.pct(S.tokTotal ? S.tok.cr / S.tokTotal : 0, 0)}</div></div>
   <div><div class="eyebrow" data-tip="${AO.tip(t('tip.cost'))}">${t('k.cost')} ⓘ</div><div class="v">${AO.usd(S.cost)}</div><div class="d">${t('k.subagents').toLowerCase()} ${AO.usd(S.subCost)}</div></div>
-  <div><div class="eyebrow" data-tip="${AO.tip(t('tip.ctx'))}">${t('k.context')} ⓘ</div><div class="v">${AO.tok(main.ctx)}<small>/ 1M</small></div><div class="d"><div class="bullet" style="width:90px;margin-top:6px"><i style="width:${ctxPct * 100}%;background:${ctxPct > .8 ? 'var(--bad)' : 'var(--gold)'}"></i><b style="left:80%"></b></div></div></div>
+  <div><div class="eyebrow" data-tip="${AO.tip(t('tip.ctx'))}">${t('k.context')} ⓘ</div><div class="v">${AO.tok(main.ctx)}<small>/ 1M</small></div><div class="d"><div class="bullet" style="width:90px;margin-top:6px"><i style="width:${ctxPct * 100}%;background:${AO.ctxHigh(main.ctx) ? 'var(--bad)' : 'var(--gold)'}"></i><b style="left:${AO.thr('ctxRatio', .8) * 100}%"></b></div></div></div>
   <div><div class="eyebrow">${t('p.agents')}</div><div class="v">${S.agents.length}</div><div class="d">${subs.filter(a => a.status === 'run').length} ${t('st.run').toLowerCase()}</div></div>
   <div><div class="eyebrow">${t('k.calls')}</div><div class="v">${AO.n(S.calls)}</div><div class="d">${Object.keys(S.tools).length} tool</div></div>
-  <div><div class="eyebrow">${t('k.errors')}</div><div class="v" style="${S.errs > 20 && rate > .03 ? 'color:var(--bad)' : ''}">${AO.pct(rate)}</div><div class="d">${S.errs} / ${AO.n(S.calls)}</div></div>
+  <div><div class="eyebrow">${t('k.errors')}</div><div class="v" style="${AO.errFlag(S) ? 'color:var(--bad)' : ''}">${AO.pct(rate)}</div><div class="d">${S.errs} / ${AO.n(S.calls)}</div></div>
   ${mode === 'detail' ? `<div><div class="eyebrow">${t('k.files')}</div><div class="v">${writes.length}</div><div class="d" data-tip="${AO.tip(t('x.est'))}">+${AO.n(writes.reduce((x, f) => x + f.plus, 0))} −${AO.n(writes.reduce((x, f) => x + f.minus, 0))}</div></div>
   <div><div class="eyebrow">${t('k.skills')} · MCP</div><div class="v">${new Set(S.skills.map(s => s.name)).size}<small>· ${Object.keys(S.mcp).length}</small></div><div class="d">${Object.values(S.mcp).reduce((x, m) => x + Object.values(m).reduce((y, z) => y + z, 0), 0)} MCP</div></div>` : ''}
 </div>`;
@@ -163,7 +163,7 @@ function render(D) {
       return `<tr><td><div style="display:flex;align-items:center;gap:9px"><span style="width:8px;height:8px;border-radius:50%;background:${AO.color(a)};flex:none"></span><div style="min-width:0"><b style="font-weight:500">${AO.esc(lbl(a))}</b><div class="faint" style="font-size:11px;max-width:190px;overflow:hidden;text-overflow:ellipsis">${AO.esc(a.desc || (S.skills.length ? '✦ ' + S.skills[S.skills.length - 1].name : ''))}</div></div></div></td>
       <td>${AO.status(a.status)}</td><td class="dim">${mdl(a)}</td>
       <td><div class="now2">${a.now ? `<b>${AO.esc(a.now.tool.replace(/^mcp__/, ''))}</b><span class="dim">${AO.esc(a.now.text)}</span>` : '—'}</div></td>
-      <td><div class="ctxb"><div class="bullet"><i style="width:${a.ctx / 1e6 * 100}%;background:${AO.color(a)}"></i><b style="left:80%"></b></div><span class="num dim">${AO.tok(a.ctx)}</span></div></td>
+      <td><div class="ctxb"><div class="bullet"><i style="width:${a.ctx / AO.ctxWindow() * 100}%;background:${AO.color(a)}"></i><b style="left:${AO.thr('ctxRatio', .8) * 100}%"></b></div><span class="num dim">${AO.tok(a.ctx)}</span></div></td>
       <td><div style="display:flex;align-items:center;gap:8px"><div class="stack" style="width:${Math.max(6, tt / mxT * 90)}px"><i style="flex:${a.tok.cr};background:color-mix(in srgb, ${AO.color(a)} 45%, transparent)"></i><i style="flex:${a.tok.cw};background:${AO.color(a)}"></i><i style="flex:${a.tok.out};background:var(--txt)"></i></div><span class="num">${AO.tok(tt)}</span></div></td>
       <td class="r">${AO.usd(a.cost)}</td>
       <td><div class="tools2">${(a.tools || []).slice(0, 3).map(([n, v]) => `<span style="${n.startsWith('mcp__') ? 'color:var(--mcp)' : ''}">${AO.esc(n.startsWith('mcp__') ? n.split('__')[1].replace('claude_ai_', '') : n)}<b>${AO.esc(v)}</b></span>`).join('')}${(a.tools || []).length > 3 ? `<span>+${a.tools.length - 3}</span>` : ''}</div></td>

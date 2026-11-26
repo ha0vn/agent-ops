@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { openCursor, readNew } from '../src/sources/claude-code/reader.js';
 import { createAgent, applyRecord } from '../src/sources/claude-code/agent.js';
-import { buildSession, labelOf } from '../src/sources/claude-code/session.js';
+import { buildSession, labelOf, sessionStatus } from '../src/sources/claude-code/session.js';
 import { DEFAULT_PRICES } from '../src/pricing.js';
 import { DEFAULT_CONFIG } from '../src/config.js';
 import { makeFixtures } from './fixtures/make-fixtures.js';
@@ -83,4 +83,19 @@ test('byDay tok per local day', () => {
   const total = Object.values(s.byDay).reduce((x, d) => x + d.tok, 0);
   assert.equal(total, s.tokTotal);
   assert.ok(s.byDay['2026-11-26'].tok > 0);
+});
+
+test('an unanswered AskUserQuestion is waiting, not running', () => {
+  const st = createAgent();
+  applyRecord(st, { type: 'assistant', timestamp: '2026-11-26T03:00:00Z', message: { id: 'q1', role: 'assistant', model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 'tq', name: 'AskUserQuestion', input: { questions: [] } }], usage: { input_tokens: 0, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } } }, DEFAULT_PRICES);
+  const t = Date.parse('2026-11-26T03:00:00Z');
+  assert.equal(sessionStatus(st, t, t + 5 * 60e3), 'wait');
+  assert.equal(sessionStatus(st, t, t + 30e3), 'run');
+});
+
+test('session without a title keeps title null (pages render the placeholder)', () => {
+  const st = createAgent();
+  applyRecord(st, { type: 'user', timestamp: '2026-11-26T03:00:00Z', message: { role: 'user', content: 'hi' } }, DEFAULT_PRICES);
+  const s = buildSession({ id: 'x1', projectDir: 'p', main: st, mainMtime: 0, subs: [] }, Date.parse('2026-11-26T04:00:00Z'));
+  assert.equal(s.title, null);
 });

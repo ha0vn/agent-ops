@@ -42,6 +42,7 @@ function validatePatch(p) {
   return null;
 }
 
+const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'";
 const MAX_BODY = 64 * 1024;
 const KEEPALIVE_MS = 25000;
 
@@ -109,7 +110,10 @@ export function startServer({ store, stateDir, webDir, port = 4317, host = '127.
     if (file !== root && !file.startsWith(root + path.sep)) return send(res, 404, 'not found');
     fs.readFile(file, (err, buf) => {
       if (err) return send(res, 404, 'not found');
-      send(res, 200, buf, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream' });
+      const ext = path.extname(file).toLowerCase();
+      const h = { 'Content-Type': MIME[ext] || 'application/octet-stream' };
+      if (ext === '.html') { h['X-Frame-Options'] = 'DENY'; h['Content-Security-Policy'] = CSP; }
+      send(res, 200, buf, h);
     });
   };
 

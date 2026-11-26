@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -37,6 +38,27 @@ test('prints url and serves; second launch reuses instance', async () => {
     assert.match(b.out(), /already running/);
   } finally {
     a.child.kill(); b?.child.kill();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('second launch finds an instance that fell forward to port+1', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ao-cli2-'));
+  makeFixtures(path.join(tmp, 'claude', 'projects'));
+  const env = { AGENT_OPS_HOME: path.join(tmp, 'home'), CLAUDE_CONFIG_DIR: path.join(tmp, 'claude') };
+  const port = 45000 + Math.floor(Math.random() * 2000);
+  const dummy = http.createServer((_, res) => res.end('nope'));
+  await new Promise((r) => dummy.listen(port, '127.0.0.1', r));
+  const a = run(env, port);
+  let b;
+  try {
+    assert.ok(await until(() => /http:\/\/127\.0\.0\.1:\d+/.test(a.out())), 'no url printed');
+    assert.ok(a.out().includes(`127.0.0.1:${port + 1}`), a.out());
+    b = run(env, port);
+    await new Promise((res) => b.child.on('exit', res));
+    assert.match(b.out(), new RegExp(`already running: http://127\.0\.0\.1:${port + 1}`));
+  } finally {
+    a.child.kill(); b?.child.kill(); dummy.close();
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });

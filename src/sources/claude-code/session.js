@@ -1,4 +1,5 @@
 import { agentSummary } from './agent.js';
+import { redact } from '../../redact.js';
 import { dayKey } from '../../time.js';
 import { DEFAULT_CONFIG } from '../../config.js';
 
@@ -6,6 +7,10 @@ const base = (p) => String(p || '').split(/[\\/]/).filter(Boolean).slice(-1)[0] 
 const r4 = (n) => +n.toFixed(4);
 const asSummary = (s) => (typeof s.errs === 'number' && Array.isArray(s.events) ? s : agentSummary(s));
 const pendingCount = (p) => (Array.isArray(p) ? p.length : p ? Object.keys(p).length : 0);
+
+// pending tools other than an AskUserQuestion (which means the agent waits for the human)
+const busyCount = (s) => (typeof s.pendingBusy === 'number' ? s.pendingBusy
+  : Array.isArray(s.pending) ? s.pending.length : Object.values(s.pending || {}).filter((p) => p.n !== 'AskUserQuestion').length);
 
 export function labelOf(desc) {
   const d = String(desc || '');
@@ -17,7 +22,7 @@ export function labelOf(desc) {
 
 function isRunning(s, mtime, now, thr) {
   const age = now - (mtime || s.t1 || 0);
-  return age < thr.runMinutes * 60e3 || (pendingCount(s.pending) > 0 && age < thr.pendingToolMinutes * 60e3);
+  return age < thr.runMinutes * 60e3 || (busyCount(s) > 0 && age < thr.pendingToolMinutes * 60e3);
 }
 
 export function sessionStatus(main, mtime, now, thr = DEFAULT_CONFIG.thresholds) {
@@ -44,7 +49,7 @@ export function buildSession({ id, projectDir, main, mainMtime, subs = [] }, now
     .sort((p, q) => (p.a.t0 || 0) - (q.a.t0 || 0));
   const agents = [{ key: 'main', label: 'main', desc: null, model: m.model, depth: 0, parent: null, a: m, mtime: mainMtime }]
     .concat(subList.map((x) => ({
-      key: x.agentId, label: labelOf(x.meta.description), desc: x.meta.description || 'agent', model: x.a.model || x.meta.model,
+      key: x.agentId, label: labelOf(x.meta.description), desc: redact(x.meta.description || 'agent'), model: x.a.model || x.meta.model,
       type: x.meta.agentType, depth: x.meta.spawnDepth || 1, parent: x.meta.toolUseId, finished: !!x.meta.finished, a: x.a, mtime: x.mtime, meta: x.meta,
     })));
   const cnt = {};
@@ -120,7 +125,7 @@ export function buildSession({ id, projectDir, main, mainMtime, subs = [] }, now
   }
 
   return {
-    id, short: id.slice(0, 8), title: m.title || '(chưa đặt tên)', project: m.cwd ? base(m.cwd) : projectDir, projectDir, entry: m.entry,
+    id, short: id.slice(0, 8), title: m.title || null, project: m.cwd ? base(m.cwd) : projectDir, projectDir, entry: m.entry,
     t0: m.t0, t1, mtime: mainMtime, status: st0,
     tok, tokTotal: tok.in + tok.out + tok.cw + tok.cr, cost: r4(cost), subCost: r4(subCost), costByType, byModel, byDay,
     errs, calls, tools, mcp, ctx: m.ctx,

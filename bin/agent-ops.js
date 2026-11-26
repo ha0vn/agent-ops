@@ -35,13 +35,17 @@ function probe(port) {
 const stateDir = getStateDir();
 const config = loadConfig(stateDir);
 const port = Number(opt('--port')) || config.port || 4317;
-const wantOpen = flag('--open') && !flag('--no-open');
+// Browser rule (same for a fresh start and for reusing a running instance): open it unless --no-open.
+const wantOpen = !flag('--no-open');
 
-if (await probe(port)) {
-  const url = `http://127.0.0.1:${port}`;
-  console.log(`Agent Ops already running: ${url}`);
-  if (wantOpen) openBrowser(url);
-  process.exit(0);
+// The server falls forward up to 10 ports when the configured one is busy, so look for a running instance there too.
+for (let p = port; p <= port + 10; p++) {
+  if (await probe(p)) {
+    const url = `http://127.0.0.1:${p}`;
+    console.log(`Agent Ops already running: ${url}`);
+    if (wantOpen) openBrowser(url);
+    process.exit(0);
+  }
 }
 
 const store = new Store({ env: process.env, stateDir, config });
@@ -49,7 +53,7 @@ await store.refresh();
 const stop = watch(store, { roots: [claudeProjectsDir()], onError: (e) => log(`watch error: ${e?.message || e}`) });
 const server = await startServer({ store, stateDir, webDir: fileURLToPath(new URL('../web', import.meta.url)), port });
 console.log(`Agent Ops: ${server.url}`);
-if (!flag('--no-open')) openBrowser(server.url);
+if (wantOpen) openBrowser(server.url);
 
 let closing = false;
 const shutdown = async () => {

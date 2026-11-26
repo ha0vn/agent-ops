@@ -76,12 +76,12 @@ else {
     const lanes = [s.agents[0], ...subs.sort((a, b) => b.t1 - a.t1)].slice(0, 5);
     const sk = s.skills.length ? s.skills[s.skills.length - 1].name.replace('superpowers:', '') : null;
     return `<section class="con ${cls}">
-      <div class="hd">${AO.status(s.status)}${AO.sourceBadge(s)}<span class="t" title="${AO.esc(s.title)}">${AO.esc(s.title)}</span><a class="act" href="/session.html?id=${encodeURIComponent(s.id)}">${t('a.open')} ↗</a>${s.status === 'wait' ? AO.resumeBtn(s, true) : ''}</div>
+      <div class="hd">${AO.status(s.status)}${AO.sourceBadge(s)}<span class="t" title="${AO.esc(AO.title(s))}">${AO.esc(AO.title(s))}</span><a class="act" href="/session.html?id=${encodeURIComponent(s.id)}">${t('a.open')} ↗</a>${s.status === 'wait' ? AO.resumeBtn(s, true) : ''}</div>
       <div class="sub"><span class="mono">${AO.esc(s.short)}</span><span>${AO.esc(s.project)}</span><span>${AO.dur(s.t1 - s.t0)}</span><span>${AO.ago(s.t1)}</span>${prob.map(([lv, x]) => `<span class="flag ${AO.esc(lv)}">${AO.esc(x)}</span>`).join('')}</div>
       <div class="body">${AO.orbit(s, { size: 150, mini: true, maxPer: 6 })}
         <div><div class="kv">
           <span>${t('k.tokens')}<b>${AO.tok(s.tokTotal)}</b></span><span data-tip="${AO.tip(AO.esc(t('tip.cost')))}">${t('k.cost')}<b>${AO.usd(s.cost)}</b></span>
-          <span data-tip="${AO.tip(AO.esc(t('tip.ctx')))}">${t('k.context')}<b style="${s.ctx > 8e5 ? 'color:var(--bad)' : ''}">${AO.tok(s.ctx)}</b></span><span>${t('k.errors')}<b style="${s.errs > 20 ? 'color:var(--bad)' : ''}">${s.errs ? AO.pct(s.errs / s.calls) : '—'}</b></span></div>
+          <span data-tip="${AO.tip(AO.esc(t('tip.ctx')))}">${t('k.context')}<b style="${AO.ctxHigh(s.ctx) ? 'color:var(--bad)' : ''}">${AO.tok(s.ctx)}</b></span><span>${t('k.errors')}<b style="${AO.errFlag(s) ? 'color:var(--bad)' : ''}">${s.errs ? AO.pct(s.errs / s.calls) : '—'}</b></span></div>
           <div style="margin-top:10px">${sk ? `<span class="skc">${AO.esc(sk)}</span>` : ''}${Object.keys(s.mcp).map(m => `<span class="mc">${AO.esc(m.replace('claude_ai_', ''))}</span>`).join('')}</div></div></div>
       <div class="lanes">${lanes.map(a => `<div class="lane"><span>${AO.esc(lbl(a))}</span><div class="tr"><i style="left:${P(a.t0)}%;width:${Math.max(1, P(a.t1) - P(a.t0))}%;background:${AO.color(a)}"></i></div></div>`).join('')}
         ${s.agents.length > 5 ? `<div class="faint" style="font-size:10.5px;margin-left:72px">+${s.agents.length - 5}</div>` : ''}</div>
@@ -89,7 +89,7 @@ else {
         return `<div class="ev ${e.err ? 'err' : ''}"><span class="faint mono">${AO.time2(e.ts)}</span><span style="color:${AO.color(a)}">${AO.esc(lbl(a))}</span><span class="dim">${AO.esc(e.tool.replace(/^mcp__.*__/, ''))}</span><span class="x">${e.err ? '✕ ' : ''}${AO.esc(e.text)}</span></div>`; }).join('')}</div>
     </section>`; }).join('');
   h += `<div class="wall ${layout === 'focus' ? 'focus' : ''}">${cards}${layout === 'grid' ? `<a class="slot" href="/"><div><div class="big">＋</div>${AO.lang === 'en' ? 'Pin a session' : 'Ghim phiên'}</div></a>` : ''}</div>`;
-  const items = open.flatMap(s => s.events.slice(0, 3).map(e => `<span><b>${AO.esc(s.title.split(' ').slice(0, 4).join(' '))}</b> · ${AO.esc(e.agent === 'main' ? t('r.main') : e.agent)} · ${AO.esc(e.tool.replace(/^mcp__.*__/, ''))} ${AO.esc(e.text)}</span>`));
+  const items = open.flatMap(s => s.events.slice(0, 3).map(e => `<span><b>${AO.esc(AO.title(s).split(' ').slice(0, 4).join(' '))}</b> · ${AO.esc(e.agent === 'main' ? t('r.main') : e.agent)} · ${AO.esc(e.tool.replace(/^mcp__.*__/, ''))} ${AO.esc(e.text)}</span>`));
   h += `<div class="ticker"><div class="lb">${AO.lang === 'en' ? 'ALL SESSIONS' : 'LUỒNG CHUNG'}</div><div class="run">${items.concat(items).join('')}</div></div>`;
 }
 document.getElementById('app').innerHTML = h;

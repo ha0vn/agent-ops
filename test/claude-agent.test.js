@@ -130,3 +130,9 @@ test('incremental reads equal a single read (any split, multibyte, CRLF)', () =>
   assert.deepEqual(run(crlf, [cr]), whole);
   assert.deepEqual(run(crlf, [cr, cr + 1, crlf.indexOf(Buffer.from("ế")) + 2]), whole);
 });
+
+test('Skill tool_use without a skill name is normalised', () => {
+  const st = createAgent();
+  applyRecord(st, { type: 'assistant', timestamp: '2026-11-26T03:00:00Z', message: { id: 'm1', role: 'assistant', model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 't1', name: 'Skill', input: {} }], usage: { input_tokens: 0, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } } }, DEFAULT_PRICES);
+  assert.deepEqual(agentSummary(st).skills.map((x) => x.name), ['?']);
+});

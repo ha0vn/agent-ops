@@ -38,6 +38,7 @@
     'tip.saved': ['Nếu mọi lần đọc cache phải trả giá input đầy đủ.', 'If every cache read were billed at the full input price.'],
     'empty.title': ['Chưa có phiên nào', 'No sessions yet'], 'empty.body': ['Chạy Claude Code một lần, phiên sẽ hiện ở đây.', 'Run Claude Code once and sessions appear here.'],
     'err.banner': ['Mất kết nối tới máy chủ — đang hiện dữ liệu cũ, tự thử lại.', 'Lost connection to the server — showing older data, retrying.'],
+    'x.untitled': ['(chưa đặt tên)', '(untitled)'],
     'stale.banner': ['Đang cập nhật…', 'Updating…'],
   };
 
@@ -64,6 +65,13 @@
   AO.dur = ms => { const m = Math.round(ms / 60e3); if (m < 1) return Math.max(1, Math.round(ms / 1e3)) + 's'; if (m < 60) return m + 'm'; const h = Math.floor(m / 60); return h < 48 ? h + 'h ' + (m % 60) + 'm' : Math.floor(h / 24) + 'd ' + (h % 24) + 'h'; };
   AO.ago = ts => { const ms = AO.NOW - ts; if (ms < 60e3) return AO.t('x.now'); return AO.lang === 'en' ? AO.dur(ms) + ' ago' : AO.dur(ms) + ' trước'; };
   AO.dayKey = ts => { const d = new Date(ts); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+  AO.title = s => (s && s.title) || AO.t('x.untitled');
+  AO.niceMax = m => { if (!(m > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(m))); for (const f of [1, 2, 5, 10]) if (f * p >= m) return f * p; return 10 * p; };
+  const thr = (k, d) => { const v = AO.D.config.thresholds || {}; return v[k] ?? d; };
+  AO.thr = thr;
+  AO.errFlag = s => s.errs > thr('errCount', 20) && (s.calls ? s.errs / s.calls : 0) > thr('errRate', .03);
+  AO.ctxHigh = ctx => ctx > thr('ctxRatio', .8) * thr('ctxWindow', 1e6);
+  AO.ctxWindow = () => thr('ctxWindow', 1e6);
   AO.esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   AO.model = m => !m ? '—' : m.replace('claude-', '').replace(/-(\d)-(\d)$/, ' $1.$2').replace(/^./, c => c.toUpperCase());
 

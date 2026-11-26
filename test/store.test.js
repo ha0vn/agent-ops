@@ -198,3 +198,16 @@ test('setConfig changes what the next snapshot reports', () => {
   store.setConfig({ ...store.config, budget: 123 });
   assert.equal(store.snapshot(NOW).config.budget, 123);
 });
+
+test('refresh picks up a source whose log dir appears after construction', () => {
+  const home = path.join(tmp, 'late');
+  const e = { CLAUDE_CONFIG_DIR: home, AGENT_OPS_HOME: state };
+  const store = new Store({ env: e, stateDir: state });
+  assert.deepEqual(store.refresh(NOW), []);
+  const f = path.join(home, 'projects', 'proj-z', 'z1.jsonl');
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.writeFileSync(f, asst(T(1), 'mz', [{ type: 'text', text: 'hi' }], 3, 'z1'));
+  touch(f);
+  assert.deepEqual(store.refresh(NOW), ['z1']);
+  assert.ok(store.snapshot(NOW).sessions.some((s) => s.id === 'z1'));
+});

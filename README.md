@@ -33,11 +33,11 @@ Agent Ops is a dashboard that runs on your own machine (localhost). It reads Cla
 
 ### Usage
 
-Run `/agent-ops` in Claude Code, or `npm start` and open `http://127.0.0.1:4317`. The UI is available in Vietnamese and English.
+Run `/agent-ops` in Claude Code (it may appear as `/agents-ops:agent-ops`), or `npm start`; both start the server and open the browser at `http://127.0.0.1:4317`. If that port is busy the server uses the next free one, and a second launch finds the running instance (checks the port and the next 10) and reuses it. The browser opens on every launch unless you pass `--no-open`. The UI is available in Vietnamese and English.
 
 ### Configuration
 
-`~/.agent-ops/config.json` (override the directory with `AGENT_OPS_HOME`): per-model prices, alert thresholds, budgets, port (default `4317`). Example:
+`~/.agent-ops/config.json` (override the directory with `AGENT_OPS_HOME`): per-model prices, alert thresholds, budgets, port (default `4317`). Edits to the file need a restart (changes made in the UI apply live). Example:
 
 ```json
 {
@@ -74,7 +74,7 @@ npm test
 
 License: MIT.
 
-Try it without real logs: `node scripts/demo.js --open` (writes fake sessions to a temp folder).
+Try it without real logs: `node scripts/demo.js` (writes fake sessions to a temp folder and serves them on port 4399; it refuses to start if that port is already taken).
 
 ---
 
@@ -101,11 +101,11 @@ Xem ảnh minh hoạ ở phần English phía trên.
 
 ### Dùng
 
-Mở `/agent-ops` trong Claude Code, hoặc chạy `npm start` rồi mở `http://127.0.0.1:4317`. Giao diện có tiếng Việt và tiếng Anh.
+Mở `/agent-ops` trong Claude Code (lệnh có thể hiện là `/agents-ops:agent-ops`), hoặc chạy `npm start`; cả hai khởi động server và mở trình duyệt tại `http://127.0.0.1:4317`. Cổng bận thì dùng cổng trống kế tiếp; lần chạy thứ hai tự tìm bản đang chạy (cổng đó và 10 cổng sau) và dùng lại. Trình duyệt mở ở mọi lần chạy, trừ khi thêm `--no-open`. Giao diện có tiếng Việt và tiếng Anh.
 
 ### Cấu hình
 
-Tệp `~/.agent-ops/config.json` (đổi thư mục bằng biến `AGENT_OPS_HOME`): giá theo model, ngưỡng cảnh báo, ngân sách, cổng (mặc định `4317`). Ví dụ:
+Tệp `~/.agent-ops/config.json` (đổi thư mục bằng biến `AGENT_OPS_HOME`): giá theo model, ngưỡng cảnh báo, ngân sách, cổng (mặc định `4317`). Sửa tay tệp này cần khởi động lại (chỉnh trong giao diện thì áp dụng ngay). Ví dụ:
 
 ```json
 {
@@ -128,11 +128,11 @@ Tệp `~/.agent-ops/config.json` (đổi thư mục bằng biến `AGENT_OPS_HOM
 | Nguồn | Trạng thái |
 |---|---|
 | Claude Code | ✔ |
-| Codex CLI | đang làm |
-| Gemini CLI | đang làm |
-| Cursor | đang làm |
-| VS Code Copilot | đang làm |
-| Antigravity | đang làm |
+| Codex CLI | dự kiến |
+| Gemini CLI | dự kiến |
+| Cursor | dự kiến |
+| VS Code Copilot | dự kiến |
+| Antigravity | dự kiến |
 
 ### Phát triển
 
@@ -142,4 +142,4 @@ npm test
 
 Giấy phép: MIT.
 
-Chạy thử không cần log thật: `node scripts/demo.js --open` (tạo phiên giả trong thư mục tạm).
+Chạy thử không cần log thật: `node scripts/demo.js` (tạo phiên giả trong thư mục tạm, phục vụ ở cổng 4399; từ chối chạy nếu cổng đó đã bị chiếm).

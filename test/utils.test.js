@@ -36,7 +36,7 @@ test('redact', () => {
   const r = redact('mail a.b@c.vn and sk-ABCdef1234567890xyz and eyJhbGciOiJIUzI1NiJ9.x');
   assert.ok(!r.includes('@c.vn') && !r.includes('sk-ABC') && !r.includes('eyJhbG'));
   assert.equal(redact('mcp__playwright__browser_take_screenshot'), 'mcp__playwright__browser_take_screenshot');
-  const s = '2026-11-26-consolidator-tenant-self-scope-design';
+  const s = '2026-11-26-feature-x-design';
   assert.equal(redact(s), s);
 });
 

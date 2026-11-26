@@ -4,8 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Ops</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/ao.css">
 <style>
   /* Question: "how much did my agents consume (API-price equivalent), and where did it go?" */
@@ -68,7 +66,7 @@ const list = AO.list(W), prev = AO.state === 'empty' ? [] : AO.sessions(PW);
 let h = AO.banner();
 if (!list.length) { h += `<div class="panel" style="margin-top:16px">${AO.emptyState()}</div>`; app.innerHTML = AO.header('cost') + h; AO.init(); return; }
 const cur = AO.sumDays(list, W), before = AO.sumDays(prev, PW);
-const todayK = AO.dayKey(NOW), today = AO.sumDays(list, [Date.parse(todayK + 'T00:00:00+07:00'), NOW]);
+const todayK = AO.dayKey(NOW), today = AO.sumDays(list, [AO.dayStart(NOW), NOW]);
 const subCost = list.reduce((a, s) => a + s.subCost, 0), allCost = list.reduce((a, s) => a + s.cost, 0) || 1;
 const byModel = {}; for (const s of list) for (const [m, v] of Object.entries(s.byModel)) { if (m === '<synthetic>') continue; const x = byModel[m] = byModel[m] || { tok: 0, cr: 0, cost: 0 }; x.tok += v.in + v.out + v.cw + v.cr; x.cr += v.cr; x.cost += v.cost; }
 const KEYS = ['in', 'out', 'cw', 'cr'], P = AO.D.price || {};
@@ -90,14 +88,14 @@ h += `<div class="strip" style="--n:6;margin-top:16px">
 // daily stacked bars (real per-type cost per day)
 const days = []; for (let d = W[0]; d <= NOW; d += 864e5) days.push(AO.dayKey(d));
 const per = days.map(d => { const o = { cr: 0, cw: 0, out: 0, in: 0 }; for (const s of list) { const v = s.byDay[d]; if (v) for (const k in o) o[k] += v[k]; } o.tot = o.cr + o.cw + o.out + o.in; return o; });
-const maxD = Math.max(...per.map(p => p.tot), 1), nice = Math.ceil(maxD / 50) * 50;
+const maxD = Math.max(...per.map(p => p.tot), 1), nice = AO.niceMax(maxD);
 const step = days.length > 14 ? Math.ceil(days.length / 10) : 1;
 h += `<div class="g2"><section class="panel"><div class="ph"><h3>${t('p.byday')}</h3><span class="r">${AO.lang === 'en' ? 'stacked by token type' : 'xếp chồng theo loại token'}</span></div>
   <div class="yax"><span>${AO.usd(nice, 0)}</span><span></span></div>
-  <div class="bars">${per.map((p, i) => `<div><div class="col ${days[i] === todayK ? 'today' : ''}" style="height:${p.tot / nice * 100}%;animation-delay:${i * 25}ms" data-tip="${AO.tip(`<b>${AO.usd(p.tot)}</b>${days[i].slice(8)}/${days[i].slice(5, 7)}${days[i] === todayK ? (AO.lang === 'en' ? ' · in progress' : ' · đang diễn ra') : ''}<br>${t('t.cr')} ${AO.usd(p.cr)} · ${t('t.cw')} ${AO.usd(p.cw)} · ${t('t.out')} ${AO.usd(p.out)}`)}">
-    <i style="flex:${p.cr};background:color-mix(in srgb, var(--gold) 40%, transparent)"></i><i style="flex:${p.cw};background:var(--gold)"></i><i style="flex:${p.out};background:var(--txt)"></i></div></div>`).join('')}</div>
+  <div class="bars">${per.map((p, i) => `<div><div class="col ${days[i] === todayK ? 'today' : ''}" style="height:${p.tot / nice * 100}%;animation-delay:${i * 25}ms" data-tip="${AO.tip(`<b>${AO.usd(p.tot)}</b>${days[i].slice(8)}/${days[i].slice(5, 7)}${days[i] === todayK ? (AO.lang === 'en' ? ' · in progress' : ' · đang diễn ra') : ''}<br>${t('t.cr')} ${AO.usd(p.cr)} · ${t('t.cw')} ${AO.usd(p.cw)} · ${t('t.out')} ${AO.usd(p.out)} · ${t('t.in')} ${AO.usd(p.in)}`)}">
+    <i style="flex:${p.cr};background:color-mix(in srgb, var(--gold) 40%, transparent)"></i><i style="flex:${p.in};background:var(--worker)"></i><i style="flex:${p.cw};background:var(--gold)"></i><i style="flex:${p.out};background:var(--txt)"></i></div></div>`).join('')}</div>
   <div class="bax">${days.map((d, i) => `<span>${i % step ? '' : d.slice(8) + '/' + d.slice(5, 7)}</span>`).join('')}</div>
-  <div class="legend"><span><i style="background:color-mix(in srgb, var(--gold) 40%, transparent)"></i>${t('t.cr')}</span><span><i style="background:var(--gold)"></i>${t('t.cw')}</span><span><i style="background:var(--txt)"></i>${t('t.out')}</span><span><i style="background:none;outline:1px dashed var(--gold)"></i>${t('range.today')}</span></div></section>`;
+  <div class="legend"><span><i style="background:color-mix(in srgb, var(--gold) 40%, transparent)"></i>${t('t.cr')}</span><span><i style="background:var(--gold)"></i>${t('t.cw')}</span><span><i style="background:var(--txt)"></i>${t('t.out')}</span><span><i style="background:var(--worker)"></i>${t('t.in')}</span><span><i style="background:none;outline:1px dashed var(--gold)"></i>${t('range.today')}</span></div></section>`;
 
 // where it goes
 const tot = cur.cr + cur.cw + cur.out + cur.in || 1;
@@ -119,7 +117,7 @@ const month = AO.dayKey(NOW).slice(0, 7), monthCost = AO.D.sessions.reduce((a, s
 const budget = AO.D.config.budget, dom = +AO.dayKey(NOW).slice(8), dim = new Date(+month.slice(0, 4), +month.slice(5, 7), 0).getDate(), proj = monthCost / dom * dim;
 h += `<div class="g2"><section class="panel"><div class="ph"><h3>${t('p.top')}</h3><span class="r"><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--gold)"></i> ${t('r.main')} &nbsp;<i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--worker)"></i> ${t('k.subagents').toLowerCase()}</span></div>
   <div style="overflow-x:auto"><table><thead><tr><th>${t('c.session')}</th><th>${t('c.date')}</th><th class="r">${t('p.agents')}</th><th>${t('k.cost')}</th><th class="r">${t('k.tokens')}</th><th class="r">$/h</th></tr></thead><tbody>
-  ${topS.map(s => `<tr class="click" onclick="location.href='/session.html?id=${encodeURIComponent(s.id)}'"><td><span class="ttl" title="${AO.esc(s.title)}">${AO.esc(s.title)}<em class="mono">${AO.esc(s.short)} · ${AO.esc(s.project)}</em></span></td><td class="dim">${AO.date(s.t0)}</td>
+  ${topS.map(s => `<tr class="click" data-href="${AO.esc('/session.html?id=' + encodeURIComponent(s.id))}"><td><span class="ttl" title="${AO.esc(AO.title(s))}">${AO.esc(AO.title(s))}<em class="mono">${AO.esc(s.short)} · ${AO.esc(s.project)}</em></span></td><td class="dim">${AO.date(s.t0)}</td>
     <td class="r">${s.agents.length > 1 ? `1 + <span style="color:var(--worker)">${s.agents.length - 1}</span>` : '<span class="dim">1</span>'}</td>
     <td><div style="display:flex;align-items:center;gap:8px"><div class="tbar" style="width:${Math.max(6, s.cost / mx * 160)}px"><i style="flex:${s.cost - s.subCost};background:var(--gold)"></i><i style="flex:${s.subCost};background:var(--worker)"></i></div><span class="num">${AO.usd(s.cost)}</span></div></td>
     <td class="r dim">${AO.tok(s.tokTotal)}</td><td class="r dim">${AO.usd(s.cost / Math.max((s.t1 - s.t0) / 3600e3, .25))}</td></tr>`).join('')}
@@ -142,6 +140,7 @@ app.innerHTML = AO.header('cost') + h;
 AO.init();
 bind();
 });
+document.addEventListener('click', e => { const tr = e.target.closest('tr[data-href]'); if (tr) location.href = tr.dataset.href; });
 </script>
 </body>
 </html>

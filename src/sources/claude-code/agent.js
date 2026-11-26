@@ -104,7 +104,7 @@ function applyToolUse(st, c, ts) {
   st.events.push(ev);
   st._ev.set(c.id, ev);
   st.lastTool = { tool: n, text: tgt, ts };
-  if (n === 'Skill') st.skills.push({ name: input.skill, ts });
+  if (n === 'Skill') st.skills.push({ name: String(input.skill || '?'), ts });
   if (n === 'Agent') st.spawns.push({ ts, desc: redact(input.description || ''), model: input.model, id: c.id });
   if (n === 'SendMessage') st.msgs.push({ ts, to: input.to, text: redact(short(input.summary || input.message, 60)) });
   if (n === 'ToolSearch') st.toolSearch++;
@@ -181,5 +181,7 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 
 export function agentSummary(st) {
   const { pending, ...rest } = st;
-  return { ...clone(rest), pending: Object.keys(pending) };
+  const ids = Object.keys(pending);
+  // tools still waiting on a result, other than a question to the user (that means "waiting for the human")
+  return { ...clone(rest), pending: ids, pendingBusy: ids.filter((k) => pending[k].n !== 'AskUserQuestion').length };
 }

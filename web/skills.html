@@ -4,8 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Ops</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/ao.css">
 <style>
   /* Question: "which skills and tools do my agents lean on, and which ones fail?" */
@@ -59,15 +57,15 @@ const chains = {}; for (const s of list) { const seq = s.skills.filter(k => k.na
   const key = seq.join(' → '); const c = chains[key] = chains[key] || { n: 0, agents: 0 }; c.n++; c.agents += s.agents.length - 1; }
 const subs = list.flatMap(s => s.agents.slice(1));
 const delegations = list.reduce((a, s) => a + s.spawns.length, 0);
-const worst = Object.entries(tools).filter(([, v]) => v.n >= 20).sort((a, b) => b[1].err / b[1].n - a[1].err / a[1].n)[0];
+const worst = Object.entries(tools).filter(([, v]) => v.n >= AO.thr('toolErrMin', 20)).sort((a, b) => b[1].err / b[1].n - a[1].err / a[1].n)[0];
 
 h += `<div class="strip" style="--n:6;margin-top:16px">
   <div><div class="eyebrow">${t('k.calls')}</div><div class="v">${AO.n(calls)}</div><div class="d">${list.length} ${t('k.sessions').toLowerCase()}</div></div>
-  <div><div class="eyebrow">${t('k.errors')}</div><div class="v">${AO.pct(errs / calls)}</div><div class="d">${AO.n(errs)} / ${AO.n(calls)}</div></div>
+  <div><div class="eyebrow">${t('k.errors')}</div><div class="v">${calls ? AO.pct(errs / calls) : '—'}</div><div class="d">${AO.n(errs)} / ${AO.n(calls)}</div></div>
   <div><div class="eyebrow">${t('k.skills')}</div><div class="v">${Object.keys(skills).length}</div><div class="d">${Object.values(skills).reduce((a, v) => a + v.n, 0)}×</div></div>
   <div><div class="eyebrow">MCP</div><div class="v">${Object.keys(mcp).length}</div><div class="d">${AO.n(Object.values(mcp).reduce((a, m) => a + Object.values(m.tools).reduce((b, c) => b + c, 0), 0))} ${t('c.calls').toLowerCase()}</div></div>
   <div><div class="eyebrow">${t('f.agent')}</div><div class="v">${delegations}</div><div class="d">${subs.length} ${t('k.subagents').toLowerCase()}</div></div>
-  <div><div class="eyebrow">${AO.lang === 'en' ? 'Most failing' : 'Lỗi nhiều nhất'}</div><div class="v" style="font-size:19px;margin-top:8px">${worst ? AO.esc(worst[0].replace(/^mcp__.*__/, '').slice(0, 18)) : '—'}</div><div class="d ${worst && worst[1].err / worst[1].n > .1 ? 'bad' : ''}">${worst ? AO.pct(worst[1].err / worst[1].n) + ' · ' + worst[1].n : ''}</div></div>
+  <div><div class="eyebrow">${AO.lang === 'en' ? 'Most failing' : 'Lỗi nhiều nhất'}</div><div class="v" style="font-size:19px;margin-top:8px">${worst ? AO.esc(worst[0].replace(/^mcp__.*__/, '').slice(0, 18)) : '—'}</div><div class="d ${worst && worst[1].err / worst[1].n > AO.thr('toolErrRate', .1) ? 'bad' : ''}">${worst ? AO.pct(worst[1].err / worst[1].n) + ' · ' + worst[1].n : ''}</div></div>
 </div>`;
 
 // skills + chains

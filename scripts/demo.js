@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Demo mode: writes a synthetic (fake) Claude Code history to a temp dir and starts Agent Ops on it.
-// Used for README screenshots and for trying the UI without real logs.  Usage: node scripts/demo.js [--port 4318] [--open]
+// Used for README screenshots and for trying the UI without real logs.  Usage: node scripts/demo.js [--port 4399] [--open]
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -83,7 +84,16 @@ solo('acme-docs', 'demo-docs', 'Write the onboarding guide', 4300, 18, (i) => ['
 solo('acme-billing', 'demo-tax', 'VAT rounding bug', 7000, 22, (i) => ['Grep', { pattern: 'Round' }]);
 
 console.log('Demo data: ' + projects);
-const port = process.argv.includes('--port') ? process.argv[process.argv.indexOf('--port') + 1] : '4318';
+// Own fixed base port so the demo never attaches to (or shows) a real running instance.
+const port = process.argv.includes('--port') ? process.argv[process.argv.indexOf('--port') + 1] : '4399';
+const answers = (p) => new Promise((resolve) => {
+  const req = http.get({ host: '127.0.0.1', port: p, path: '/api/health', headers: { Host: `127.0.0.1:${p}` }, timeout: 400 }, (res) => { res.resume(); resolve(res.statusCode === 200); });
+  req.on('timeout', () => { req.destroy(); resolve(false); });
+  req.on('error', () => resolve(false));
+});
+let running = false; // the launcher also looks at the next 10 ports, so check them all
+for (let p = Number(port); p <= Number(port) + 10 && !running; p++) running = await answers(p);
+if (running) { console.error(`Port ${port} already answers (another Agent Ops?). Stop it or pass --port <free port>; refusing to reuse it for the demo.`); process.exit(1); }
 const bin = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'agent-ops.js');
 const child = spawn(process.execPath, [bin, '--port', port, process.argv.includes('--open') ? '--open' : '--no-open'], {
   stdio: 'inherit', env: { ...process.env, CLAUDE_CONFIG_DIR: path.join(root, 'claude'), AGENT_OPS_HOME: path.join(root, 'state') } });

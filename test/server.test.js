@@ -206,3 +206,26 @@ test('busy port falls through', async () => {
     });
   } finally { await new Promise((res) => blocker.close(res)); }
 });
+
+test('html responses carry anti-framing and CSP headers', () => withServer(47340, async ({ srv }) => {
+  const r = await fetch(srv.url + '/');
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('x-frame-options'), 'DENY');
+  const csp = r.headers.get('content-security-policy');
+  assert.match(csp, /default-src 'self'/);
+  assert.match(csp, /frame-ancestors 'none'/);
+}));
+
+test('agent meta description is redacted in api data', () => withServer(47341, async ({ srv, projects, store }) => {
+  const token = 'aB3' + 'y'.repeat(30);
+  const dir = path.join(projects, 'proj-a', 's1', 'subagents');
+  fs.mkdirSync(dir, { recursive: true });
+  const line = JSON.stringify({ type: 'assistant', timestamp: '2026-11-26T03:07:00Z', sessionId: 's1', message: { id: 'ma', role: 'assistant', model: 'claude-opus-5-5', content: [{ type: 'text', text: 'x' }], usage: { input_tokens: 0, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } } }) + '\n';
+  fs.writeFileSync(path.join(dir, 'agent-zz.jsonl'), line);
+  fs.writeFileSync(path.join(dir, 'agent-zz.meta.json'), JSON.stringify({ description: `mail bob@example.com ${token}`, agentType: 'general-purpose' }));
+  store.refresh();
+  const body = await (await fetch(srv.url + '/api/data')).text();
+  assert.ok(body.includes('agent-zz') || body.includes('zz'));
+  assert.ok(!body.includes('bob@example.com'));
+  assert.ok(!body.includes(token));
+}));

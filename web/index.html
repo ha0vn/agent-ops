@@ -91,7 +91,7 @@ function render(D) {
     const last = s.events[0], sk = s.skills.length ? s.skills[s.skills.length - 1].name.replace('superpowers:', '') : null, mcp = Object.keys(s.mcp);
     return `<div class="card ${AO.esc(s.status)}">
     <div class="top">${AO.status(s.status)}<span class="ml">${AO.ago(s.t1)}</span></div>
-    <h4>${AO.esc(s.title)}</h4>
+    <h4>${AO.esc(AO.title(s))}</h4>
     <div class="faint mono" style="font-size:11px;margin-top:-4px">${AO.esc(s.short)} · ${AO.esc(s.project)}</div>
     <div class="mid">${AO.orbit(s, { size: 92, mini: true, maxPer: 5 })}
       <div class="kv"><span>${t('k.tokens')}<b>${AO.tok(s.tokTotal)}</b></span><span data-tip="${AO.tip(t('tip.cost'))}">${t('k.cost')}<b>${AO.usd(s.cost)}</b></span>
@@ -112,7 +112,7 @@ function render(D) {
     const b = s.activity.filter(x => x * 900e3 >= dayStart).sort((p, q) => p - q), segs = [];
     for (const x of b) { const l = segs[segs.length - 1]; if (l && x - l[1] <= 1) l[1] = x; else segs.push([x, x]); }
     const col = s.status === 'wait' ? 'var(--warn)' : s.status === 'run' ? 'var(--ok)' : 'var(--gold)';
-    return `<div class="lane"><span title="${AO.esc(s.title)}">${AO.esc(s.title)}</span><div class="tr">${segs.map(([a, z]) => `<i style="left:${pos(a * 900e3)}%;width:${Math.max(.6, pos((z + 1) * 900e3) - pos(a * 900e3))}%;background:${col}" data-tip="${AO.tip(AO.time(a * 900e3) + '–' + AO.time((z + 1) * 900e3))}"></i>`).join('')}
+    return `<div class="lane"><span title="${AO.esc(AO.title(s))}">${AO.esc(AO.title(s))}</span><div class="tr">${segs.map(([a, z]) => `<i style="left:${pos(a * 900e3)}%;width:${Math.max(.6, pos((z + 1) * 900e3) - pos(a * 900e3))}%;background:${col}" data-tip="${AO.tip(AO.time(a * 900e3) + '–' + AO.time((z + 1) * 900e3))}"></i>`).join('')}
     ${s.spawns.filter(p => p.ts >= dayStart).map(p => `<u style="left:${pos(p.ts)}%" data-tip="${AO.tip(`<b>${AO.time(p.ts)}</b>${AO.esc(p.desc)} · ${AO.esc(p.model || '')}`)}"></u>`).join('')}</div></div>`; }).join('');
   const ticks = [0, .25, .5, .75, 1].map(f => AO.time(dayStart + f * (NOW - dayStart)));
 
@@ -133,7 +133,7 @@ function render(D) {
     <div class="axis">${ticks.map(x => `<span>${x}</span>`).join('')}</div></section>
   <div class="grid">
     <section class="panel"><div class="ph"><h3>${t('p.attention')}</h3><span class="r">${att.length}</span></div>
-      <div class="att">${att.length ? att.map(([s, f, m, a], i) => `${i ? '<span class="sep"></span>' : ''}${f}<a class="t" href="${href(s)}" title="${AO.esc(s.title)}">${AO.esc(s.title)}</a>${a}`).join('') : `<span class="dim">✓</span>`}</div></section>
+      <div class="att">${att.length ? att.map(([s, f, m, a], i) => `${i ? '<span class="sep"></span>' : ''}${f}<a class="t" href="${href(s)}" title="${AO.esc(AO.title(s))}">${AO.esc(AO.title(s))}</a>${a}`).join('') : `<span class="dim">✓</span>`}</div></section>
     <section class="panel"><div class="ph"><h3>${t('p.byday')}</h3><span class="r">${t('k.tokens')}</span></div>
       <div class="bars">${perDay.map((v, i) => `<div><i class="${i === perDay.length - 1 ? 'today' : ''}" style="height:${Math.max(v ? 3 : 0, v / maxD * 100)}%;animation-delay:${i * 25}ms" data-tip="${AO.tip(`<b>${AO.tok(v)}</b>${days[i].slice(8)}/${days[i].slice(5, 7)}`)}"></i></div>`).join('')}</div>
       <div class="bax"><span>${days[0].slice(8)}/${days[0].slice(5, 7)}</span><span>${AO.date(NOW)}</span></div></section>
@@ -141,16 +141,16 @@ function render(D) {
 
   // all sessions table (sortable)
   const cols = [['status', t('c.status')], ['title', t('c.session')], ['src', t('c.source'), 'hide-s'], ['t0', t('c.started'), 'hide-s'], ['dur', t('k.duration'), 'r hide-s'], ['agents', t('p.agents'), 'r'], ['tok', t('k.tokens')], ['cost', t('k.cost'), 'r'], ['skills', t('k.skills'), 'hide-s'], ['mcp', 'MCP', 'hide-s'], ['errs', t('k.errors'), 'r'], ['t1', t('c.last'), 'r'], ['act', '']];
-  const key = { dur: s => s.t1 - s.t0, agents: s => s.agents.length, tok: s => s.tokTotal, cost: s => s.cost, errs: s => s.errs, t0: s => s.t0, t1: s => s.t1, title: s => s.title, src: s => s.source || '', status: s => ({ run: 0, wait: 1, stop: 2 })[s.status] };
+  const key = { dur: s => s.t1 - s.t0, agents: s => s.agents.length, tok: s => s.tokTotal, cost: s => s.cost, errs: s => s.errs, t0: s => s.t0, t1: s => s.t1, title: s => AO.title(s), src: s => s.source || '', status: s => ({ run: 0, wait: 1, stop: 2 })[s.status] };
   const table = () => {
     const rows = [...list].sort((a, b) => { const k = key[sortBy] || key.t1, x = k(a), y = k(b); return (x > y ? 1 : x < y ? -1 : 0) * dir; });
     const maxTok = Math.max(...list.map(s => s.tokTotal), 1);
     return `<table><thead><tr>${cols.map(([k, l, c]) => `<th class="${c || ''} ${key[k] ? 'sort' : ''} ${k === sortBy ? 'sorted' : ''}" data-k="${k}">${l}${k === sortBy ? (dir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('')}</tr></thead><tbody>` +
-      rows.slice(0, 40).map(s => { const mt = s.agents[0].tok, mainTok = mt.in + mt.out + mt.cw + mt.cr, rate = s.calls ? s.errs / s.calls : 0, flagged = s.errs > 20 && rate > .03;
+      rows.slice(0, 40).map(s => { const mt = s.agents[0].tok, mainTok = mt.in + mt.out + mt.cw + mt.cr, rate = s.calls ? s.errs / s.calls : 0, flagged = AO.errFlag(s);
         const sk = [...new Set(s.skills.map(x => x.name.replace('superpowers:', '')))];
         return `<tr class="click" data-href="${href(s)}">
       <td>${AO.status(s.status)}</td>
-      <td><span class="ttl" title="${AO.esc(s.title)}">${AO.esc(s.title)}<em class="mono">${AO.esc(s.short)} · ${AO.esc(s.project)}</em></span></td>
+      <td><span class="ttl" title="${AO.esc(AO.title(s))}">${AO.esc(AO.title(s))}<em class="mono">${AO.esc(s.short)} · ${AO.esc(s.project)}</em></span></td>
       <td class="hide-s">${AO.sourceBadge(s)}</td>
       <td class="dim hide-s">${AO.dt(s.t0)}</td><td class="r dim hide-s">${AO.dur(s.t1 - s.t0)}</td>
       <td class="r">${s.agents.length > 1 ? `1 + <span style="color:var(--worker)">${s.agents.length - 1}</span>` : '<span class="dim">1</span>'}</td>
