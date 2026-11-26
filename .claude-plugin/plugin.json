@@ -1,0 +1,7 @@
+{
+  "name": "agents-ops",
+  "version": "0.1.0",
+  "description": "Local dashboard for Claude Code sessions: agents, skills, tools and tokens.",
+  "author": { "name": "ha0vn" },
+  "license": "MIT"
+}
