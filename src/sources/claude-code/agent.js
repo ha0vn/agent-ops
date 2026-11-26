@@ -102,7 +102,7 @@ function applyToolUse(st, c, ts) {
     if (op) {
       if (/[\\/]memory[\\/]/.test(fp) && op === 'R') st.memReads++;
       const key = fp.toLowerCase();
-      const f = (st.files[key] = st.files[key] || { name: base(fp), dir: parent(fp), ops: {}, n: 0, plus: 0, minus: 0, last: 0 });
+      const f = (st.files[key] = st.files[key] || { name: base(fp), dir: parent(fp), ops: {}, n: 0, plus: 0, minus: 0, path: fp, last: 0 });
       f.ops[op] = (f.ops[op] || 0) + 1; f.n++; f.last = ts || f.last;
       if (n === 'Write' && input.content) f.plus += String(input.content).split('\n').length;
       if (/Edit/.test(n)) {

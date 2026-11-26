@@ -40,6 +40,7 @@ test('dedupes usage by message id', () => {
   const s = s1();
   assert.deepEqual(s.tok, { in: 10, out: 150, cw: 1000, cr: 13000 });
   assert.equal(s.turns, 2);
+  assert.equal(s.tools.Read.n, 1); // tool_use on the duplicate-id line still counts
   assert.equal(s.model, 'claude-opus-5-5');
 });
 
@@ -93,4 +94,39 @@ test('solo session waits for user and makeFixtures is idempotent', () => {
   assert.equal(s.lastAssistant.hasTool, false);
   assert.equal(s.lastUserAfter, false);
   assert.deepEqual(s.pending, []);
+});
+
+test('makeFixtures refuses roots outside tmp', () => {
+  assert.throws(() => makeFixtures(path.resolve('.')), /refusing/);
+});
+
+test('incremental reads equal a single read (any split, multibyte, CRLF)', () => {
+  const src = fs.readFileSync(path.join(root, 'proj-a', 's1.jsonl'));
+  const run = (bytes, cuts) => {
+    const f = path.join(root, 'inc.jsonl');
+    fs.writeFileSync(f, '');
+    const c = openCursor(f), st = createAgent();
+    let prev = 0;
+    for (const cut of [...cuts, bytes.length]) {
+      fs.appendFileSync(f, bytes.subarray(prev, cut));
+      prev = cut;
+      const { records, bad } = readNew(c);
+      for (const r of records) applyRecord(st, r, DEFAULT_PRICES);
+      st.bad += bad;
+    }
+    return agentSummary(st);
+  };
+  const whole = run(src, []);
+  assert.equal(whole.bad, 1);
+  const multi = src.indexOf(Buffer.from('ế')) + 1; // inside a 3-byte character
+  assert.ok(multi > 0);
+  const LF = String.fromCharCode(10), CR = String.fromCharCode(13);
+  const nl = src.indexOf(LF, 100);
+  for (const cuts of [[multi], [nl], [nl + 1], [100, 500, 501, 2000]]) assert.deepEqual(run(src, cuts), whole);
+  for (let i = 1; i < src.length; i += 13) assert.deepEqual(run(src, [i]), whole);
+  const crlf = Buffer.from(src.toString("utf8").split(LF).join(CR + LF));
+  assert.deepEqual(run(crlf, []), whole);
+  const cr = crlf.indexOf(CR) + 1; // between CR and LF
+  assert.deepEqual(run(crlf, [cr]), whole);
+  assert.deepEqual(run(crlf, [cr, cr + 1, crlf.indexOf(Buffer.from("ế")) + 2]), whole);
 });

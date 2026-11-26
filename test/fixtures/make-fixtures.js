@@ -1,5 +1,7 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const T = (min, sec = 0) => `2026-11-26T03:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}Z`;
 const OPUS = 'claude-opus-5-5';
@@ -15,7 +17,10 @@ const write = (file, text) => { fs.mkdirSync(path.dirname(file), { recursive: tr
 
 // Writes a fake Claude Code projects tree under `root` (recreated cleanly each call).
 export function makeFixtures(root) {
-  fs.rmSync(root, { recursive: true, force: true });
+  const abs = path.resolve(root);
+  const allowed = [os.tmpdir(), path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.tmp')];
+  if (!allowed.some((a) => abs.startsWith(path.resolve(a) + path.sep))) throw new Error('makeFixtures: refusing root outside tmpdir or test/.tmp: ' + abs);
+  fs.rmSync(abs, { recursive: true, force: true });
   fs.mkdirSync(root, { recursive: true });
   const c1 = { sessionId: 's1', cwd: '/work/alpha', entrypoint: 'cli' };
   const m1u = usage(10, 100, 1000, 5000);
@@ -23,8 +28,8 @@ export function makeFixtures(root) {
     { type: 'ai-title', aiTitle: 'Alpha task', timestamp: T(0), sessionId: 's1', cwd: '/work/alpha' },
     { type: 'user', timestamp: T(0, 5), sessionId: 's1', cwd: '/work/alpha', entrypoint: 'cli', message: { role: 'user', content: 'start alpha' } },
     asst(T(1), 'm1', OPUS, [toolUse('tu-skill1', 'Skill', { skill: 'superpowers:brainstorming' })], m1u, c1),
-    // same message id again (streamed as a separate line): usage must not be counted twice
-    asst(T(1, 1), 'm1', OPUS, [{ type: 'text', text: 'working on it' }], m1u, c1),
+    // same message id again (streamed as a separate line): its tool_use counts, its usage must not
+    asst(T(1, 1), 'm1', OPUS, [{ type: 'text', text: 'Tiếng Việt: working on it' }, toolUse('tu-read1', 'Read', { file_path: '/work/alpha/README.md' })], m1u, c1),
     { type: 'user', timestamp: T(1, 3), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tu-skill1', content: 'ok' }] } },
     asst(T(2), 'm2', OPUS, [
       toolUse('tu-agent1', 'Agent', { description: 'Implement Task 1: core', model: 'sonnet', prompt: 'do it' }),
