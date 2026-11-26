@@ -1,0 +1,11 @@
+{
+  "name": "agents-ops",
+  "owner": { "name": "ha0vn" },
+  "plugins": [
+    {
+      "name": "agents-ops",
+      "source": "./",
+      "description": "Local dashboard for Claude Code sessions: agents, skills, tools and tokens."
+    }
+  ]
+}

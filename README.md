@@ -10,12 +10,17 @@ Agent Ops là bảng giám sát chạy trên máy bạn (localhost), đọc log 
 
 ### Cài
 
-- **Plugin Claude Code** (lệnh `/agent-ops`): _lệnh cài chính xác sẽ được bổ sung ở bước phát hành._
+- **Plugin Claude Code** (lệnh `/agent-ops`):
+
+  ```
+  /plugin marketplace add ha0vn/agents-ops
+  /plugin install agents-ops@agents-ops
+  ```
 - **Chạy tay** (cần Node.js >= 20, không cần cài thư viện):
 
   ```sh
-  git clone <repo> agents-ops && cd agents-ops
-  npm start
+  git clone https://github.com/ha0vn/agents-ops && cd agents-ops
+  node bin/agent-ops.js --open
   ```
 
 ### Dùng
@@ -24,7 +29,16 @@ Mở `/agent-ops` trong Claude Code, hoặc chạy `npm start` rồi mở `http:
 
 ### Cấu hình
 
-Tệp `~/.agent-ops/config.json` (đổi thư mục bằng biến `AGENT_OPS_HOME`): giá theo model, ngưỡng cảnh báo, ngân sách, cổng (mặc định `4317`).
+Tệp `~/.agent-ops/config.json` (đổi thư mục bằng biến `AGENT_OPS_HOME`): giá theo model, ngưỡng cảnh báo, ngân sách, cổng (mặc định `4317`). Ví dụ:
+
+```json
+{
+  "port": 4317,
+  "budget": null,
+  "thresholds": { "runMinutes": 2, "waitHours": 3, "errRate": 0.03, "ctxRatio": 0.8 },
+  "prices": { "claude-opus-5-5": { "in": 4, "out": 20, "cw": 8, "cr": 0.2 } }
+}
+```
 
 ### Quyền riêng tư
 
@@ -60,12 +74,17 @@ Agent Ops is a dashboard that runs on your own machine (localhost). It reads Cla
 
 ### Install
 
-- **Claude Code plugin** (`/agent-ops` command): _exact install commands will be added in the release step._
+- **Claude Code plugin** (`/agent-ops` command):
+
+  ```
+  /plugin marketplace add ha0vn/agents-ops
+  /plugin install agents-ops@agents-ops
+  ```
 - **Manual** (Node.js >= 20, no dependencies to install):
 
   ```sh
-  git clone <repo> agents-ops && cd agents-ops
-  npm start
+  git clone https://github.com/ha0vn/agents-ops && cd agents-ops
+  node bin/agent-ops.js --open
   ```
 
 ### Usage
@@ -74,7 +93,16 @@ Run `/agent-ops` in Claude Code, or `npm start` and open `http://127.0.0.1:4317`
 
 ### Configuration
 
-`~/.agent-ops/config.json` (override the directory with `AGENT_OPS_HOME`): per-model prices, alert thresholds, budgets, port (default `4317`).
+`~/.agent-ops/config.json` (override the directory with `AGENT_OPS_HOME`): per-model prices, alert thresholds, budgets, port (default `4317`). Example:
+
+```json
+{
+  "port": 4317,
+  "budget": null,
+  "thresholds": { "runMinutes": 2, "waitHours": 3, "errRate": 0.03, "ctxRatio": 0.8 },
+  "prices": { "claude-opus-5-5": { "in": 4, "out": 20, "cw": 8, "cr": 0.2 } }
+}
+```
 
 ### Privacy
 
