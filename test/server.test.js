@@ -128,14 +128,67 @@ test('close ends sse streams', () => withServer(47325, async ({ srv }) => {
   assert.equal(await done, true);
 }));
 
-test('static and traversal', () => withServer(47326, async ({ srv }) => {
+const raw = (srv, p, headers = {}) => new Promise((resolve, reject) => {
+  const req = http.request({ host: '127.0.0.1', port: srv.port, path: p, agent: false, headers }, (res) => {
+    const chunks = [];
+    res.on('data', (c) => chunks.push(c));
+    res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+  });
+  req.on('error', reject);
+  req.end();
+});
+
+test('static and traversal', () => withServer(47326, async ({ srv, tmp }) => {
   const r = await fetch(srv.url + '/');
   assert.equal(r.status, 200);
   assert.match(r.headers.get('content-type'), /text\/html/);
-  assert.equal((await fetch(srv.url + '/../package.json')).status, 404);
-  assert.equal((await fetch(srv.url + '/%2e%2e/package.json')).status, 404);
-  assert.equal((await fetch(srv.url + '/..%2fpackage.json')).status, 404);
   assert.equal((await fetch(srv.url + '/missing.js')).status, 404);
+  fs.writeFileSync(path.join(tmp, 'secret.txt'), 'SENTINEL-SECRET');
+  for (const p of ['/..%2fsecret.txt', '/%2e%2e/secret.txt', '/..%5csecret.txt', '/%2e%2e%5csecret.txt', '/%00', '//secret.txt', '/../secret.txt']) {
+    const res = await raw(srv, p);
+    assert.ok(res.status === 400 || res.status === 404, p + ' -> ' + res.status);
+    assert.ok(!res.body.includes('SENTINEL-SECRET'), p);
+  }
+}));
+
+test('host header must be loopback', () => withServer(47329, async ({ srv }) => {
+  assert.equal((await raw(srv, '/api/health', { Host: 'evil.test' })).status, 403);
+  assert.equal((await raw(srv, '/', { Host: 'evil.test:' + srv.port })).status, 403);
+  assert.equal((await raw(srv, '/api/health', { Host: 'localhost:' + srv.port })).status, 200);
+}));
+
+test('config validation rejects bad values', () => withServer(47330, async ({ srv }) => {
+  const bad = [
+    { budget: -1 }, { budget: 'x' }, { lang: 'fr' }, { lang: 1 },
+    { thresholds: 5 }, { thresholds: { nope: 1 } }, { thresholds: { runMinutes: 'a' } }, { thresholds: { runMinutes: -1 } },
+    { prices: [] }, { prices: { m: 3 } }, { prices: { m: { bad: 1 } } }, { prices: { m: { in: -1 } } }, { prices: { m: { in: '2' } } },
+  ];
+  for (const b of bad) assert.equal((await post(srv, b)).status, 400, JSON.stringify(b));
+  for (const s of ['{"budget":1e999}', '{"prices":{"__proto__":{"in":1}}}', '{"thresholds":{"constructor":1}}', '{"prices":{"m":{"prototype":1}}}']) {
+    assert.equal((await post(srv, s)).status, 400, s);
+  }
+  assert.equal((await post(srv, { budget: null })).status, 200);
+  const ok = await post(srv, { prices: { 'claude-opus-5-5': { out: 21 } }, thresholds: { runMinutes: 3 }, lang: 'en' });
+  assert.equal(ok.status, 200);
+  const cfg = await ok.json();
+  assert.equal(cfg.prices['claude-opus-5-5'].out, 21);
+  assert.equal(cfg.prices['claude-opus-5-5'].in, 4);
+}));
+
+test('origin guard covers every non-GET method', () => withServer(47331, async ({ srv }) => {
+  const r = await fetch(srv.url + '/api/config', { method: 'PUT', headers: { Origin: 'http://evil.test' }, body: '{}' });
+  assert.equal(r.status, 403);
+}));
+
+test('oversized content-length gets 413 with connection close', () => withServer(47332, async ({ srv }) => {
+  const res = await new Promise((resolve, reject) => {
+    const req = http.request({ host: '127.0.0.1', port: srv.port, path: '/api/config', method: 'POST', agent: false, headers: { 'content-length': String(70 * 1024) } }, resolve);
+    req.on('error', reject);
+    req.end('{}');
+  });
+  assert.equal(res.statusCode, 413);
+  assert.equal(res.headers.connection, 'close');
+  res.resume();
 }));
 
 test('missing webDir 404s static but api works', () => withServer(47327, async ({ srv }) => {

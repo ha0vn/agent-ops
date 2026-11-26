@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
-import { saveConfig } from './config.js';
+import { saveConfig, DEFAULT_CONFIG } from './config.js';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
@@ -11,6 +11,37 @@ const MIME = {
   '.png': 'image/png', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.woff2': 'font/woff2',
 };
 const CONFIG_KEYS = new Set(['prices', 'budget', 'thresholds', 'lang']);
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const PRICE_KEYS = new Set(['in', 'out', 'cw', 'cr']);
+const isPlain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const isNum = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+const hasForbidden = (v) => isPlain(v) && Object.keys(v).some((k) => FORBIDDEN_KEYS.has(k) || hasForbidden(v[k]));
+
+// Returns an error string, or null when the patch is acceptable.
+function validatePatch(p) {
+  if (hasForbidden(p)) return 'forbidden key';
+  if ('budget' in p && p.budget !== null && !isNum(p.budget)) return 'budget must be null or a number >= 0';
+  if ('lang' in p && p.lang !== 'vi' && p.lang !== 'en') return 'lang must be vi or en';
+  if ('thresholds' in p) {
+    if (!isPlain(p.thresholds)) return 'thresholds must be an object';
+    for (const [k, v] of Object.entries(p.thresholds)) {
+      if (!Object.hasOwn(DEFAULT_CONFIG.thresholds, k)) return 'unknown threshold ' + k;
+      if (!isNum(v)) return 'threshold ' + k + ' must be a number >= 0';
+    }
+  }
+  if ('prices' in p) {
+    if (!isPlain(p.prices)) return 'prices must be an object';
+    for (const [model, pr] of Object.entries(p.prices)) {
+      if (!isPlain(pr)) return 'price for ' + model + ' must be an object';
+      for (const [k, v] of Object.entries(pr)) {
+        if (!PRICE_KEYS.has(k)) return 'unknown price key ' + k;
+        if (!isNum(v)) return 'price ' + model + '.' + k + ' must be a number >= 0';
+      }
+    }
+  }
+  return null;
+}
+
 const MAX_BODY = 64 * 1024;
 const KEEPALIVE_MS = 25000;
 
@@ -35,6 +66,8 @@ export function startServer({ store, stateDir, webDir, port = 4317, host = '127.
     return send(res, status, raw, h);
   };
 
+  const tooLarge = (res) => send(res, 413, JSON.stringify({ error: 'body too large' }), { 'Content-Type': 'application/json; charset=utf-8', Connection: 'close' });
+
   const broadcast = (ids) => {
     const msg = `event: change\ndata: ${JSON.stringify({ ids })}\n\n`;
     for (const c of clients) c.write(msg);
@@ -43,6 +76,11 @@ export function startServer({ store, stateDir, webDir, port = 4317, host = '127.
   store.on('change', onChange);
   const keepalive = setInterval(() => { for (const c of clients) c.write(': keepalive\n\n'); }, KEEPALIVE_MS);
   keepalive.unref();
+
+  const hostOk = (req) => {
+    const h = req.headers.host;
+    return h === `127.0.0.1:${boundPort}` || h === `localhost:${boundPort}`;
+  };
 
   const originOk = (req) => {
     const o = req.headers.origin;
@@ -77,27 +115,32 @@ export function startServer({ store, stateDir, webDir, port = 4317, host = '127.
 
   const handler = async (req, res) => {
     try {
-      const { pathname } = new URL(req.url, 'http://x');
+      if (!hostOk(req)) return send(res, 403, 'forbidden');
+      const pathname = req.url.split(/[?#]/)[0];
+      if (!pathname.startsWith('/')) return send(res, 400, 'bad request');
       const isApi = pathname.startsWith('/api/');
-      if (isApi && req.method === 'POST' && !originOk(req)) return send(res, 403, 'forbidden');
+      if (req.method !== 'GET' && req.method !== 'HEAD' && !originOk(req)) return send(res, 403, 'forbidden');
 
       if (pathname === '/api/health' && req.method === 'GET') return sendJson(req, res, 200, { app: 'agents-ops', version: VERSION });
       if (pathname === '/api/data' && req.method === 'GET') return sendJson(req, res, 200, store.snapshot(), true);
       if (pathname === '/api/config' && req.method === 'GET') return sendJson(req, res, 200, store.config);
       if (pathname === '/api/config' && req.method === 'POST') {
         let patch;
+        if (Number(req.headers['content-length']) > MAX_BODY) return tooLarge(res);
         try {
           const text = await readBody(req);
           patch = JSON.parse(text);
         } catch (e) {
-          if (e.status === 413) return sendJson(req, res, 413, { error: 'body too large' });
+          if (e.status === 413) return tooLarge(res);
           return sendJson(req, res, 400, { error: 'invalid json' });
         }
         if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return sendJson(req, res, 400, { error: 'body must be an object' });
         const bad = Object.keys(patch).filter((k) => !CONFIG_KEYS.has(k));
         if (bad.length) return sendJson(req, res, 400, { error: `unknown keys: ${bad.join(', ')}` });
+        const invalid = validatePatch(patch);
+        if (invalid) return sendJson(req, res, 400, { error: invalid });
         const merged = saveConfig(stateDir, patch);
-        if (typeof store.setConfig === 'function') store.setConfig(merged); else store.config = merged;
+        store.setConfig(merged);
         broadcast([]);
         return sendJson(req, res, 200, merged);
       }
@@ -134,7 +177,7 @@ export function startServer({ store, stateDir, webDir, port = 4317, host = '127.
     boundPort = server.address().port;
     return {
       port: boundPort,
-      url: `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${boundPort}`,
+      url: `http://${host}:${boundPort}`,
       close: () => new Promise((resolve) => {
         clearInterval(keepalive); store.off('change', onChange);
         for (const c of clients) c.end();
