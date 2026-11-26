@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Ops</title>
+<link rel="stylesheet" href="/assets/ao.css">
+<style>
+  /* Question: "how are this session's agents working together, what do they use, what does it cost?" */
+  .shead { display: flex; align-items: flex-start; gap: 16px; margin: 16px 0; flex-wrap: wrap; }
+  .shead h1 { font-size: 22px; font-weight: 400; letter-spacing: -.01em; }
+  .shead .meta { font-size: 12px; color: var(--dim); margin-top: 4px; }
+  .g2 { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; align-items: start; }
+  .g3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 16px 0; align-items: start; }
+  .tokrows .r { display: grid; grid-template-columns: 110px minmax(0, 1fr) 64px 58px; gap: 10px; align-items: center; height: 28px; }
+  .tokrows .r > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .legend { display: flex; gap: 14px; font-size: 11.5px; color: var(--dim); margin-top: 10px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .matrix { display: grid; gap: 3px; font-size: 11px; align-items: center; }
+  .matrix .h { color: var(--faint); text-align: center; font-size: 10px; letter-spacing: .1em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .matrix .c { height: 24px; display: grid; place-items: center; }
+  .matrix .c i { border-radius: 50%; display: block; }
+  .tl .r { display: grid; grid-template-columns: 120px minmax(0, 1fr) 70px; gap: 12px; align-items: center; height: 26px; }
+  .tl .r > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tl .track { position: relative; height: 16px; }
+  .tl .track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--hair); }
+  .tl .bar { position: absolute; top: 4px; height: 8px; border-radius: 8px; }
+  .tl .skl { position: absolute; top: 2px; height: 12px; border-radius: 3px; font-size: 9.5px; line-height: 11px; padding-left: 4px; white-space: nowrap; overflow: hidden; color: var(--txt);
+    background: color-mix(in srgb, var(--gold) 12%, transparent); border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent); }
+  .tl .dia { position: absolute; top: 4px; width: 8px; height: 8px; transform: rotate(45deg); margin-left: -4px; }
+  .axis { display: grid; grid-template-columns: 120px minmax(0, 1fr) 70px; gap: 12px; font-size: 10.5px; color: var(--faint); margin-top: 6px; }
+  .axis div { display: flex; justify-content: space-between; }
+  .feedf { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  .ev { display: grid; grid-template-columns: 64px 8px 64px 92px minmax(0, 1fr) 52px; gap: 9px; align-items: center; padding: 6px 0; border-top: 1px solid var(--hair); font-size: 12.5px; }
+  .ev .d { width: 6px; height: 6px; border-radius: 50%; }
+  .ev .x { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ev .k { color: var(--dim); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ev.err .x { color: var(--bad); }
+  .steps { position: relative; padding-left: 18px; }
+  .steps::before { content: ""; position: absolute; left: 4px; top: 6px; bottom: 6px; width: 1px; background: var(--hair2); }
+  .step { position: relative; padding-bottom: 14px; }
+  .step::before { content: ""; position: absolute; left: -18px; top: 4px; width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--gold); background: var(--bg); }
+  .step.cur::before { background: var(--gold); }
+  .step .h { display: flex; justify-content: space-between; gap: 8px; } .step .h b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .step .f { display: flex; gap: 12px; margin-top: 4px; font-size: 11.5px; color: var(--dim); flex-wrap: wrap; } .step .f b { color: var(--txt); font-weight: 500; }
+  .trow { display: grid; grid-template-columns: minmax(0, 120px) minmax(0, 1fr) 40px 64px 46px; gap: 10px; align-items: center; height: 24px; font-size: 12.5px; }
+  .trow > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .grp { font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--faint); margin: 10px 0 4px; display: flex; justify-content: space-between; }
+  .grp:first-child { margin-top: 0; }
+  .file { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 8px; align-items: center; height: 24px; font-size: 12.5px; }
+  .file .op { font-size: 9.5px; font-weight: 600; text-align: center; border-radius: 3px; padding: 1px 0; letter-spacing: .05em; }
+  .op.W { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); } .op.E { color: var(--gold); background: color-mix(in srgb, var(--gold) 14%, transparent); } .op.R { color: var(--dim); background: var(--hair); }
+  .file .p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .file .p em { font-style: normal; color: var(--faint); margin-left: 4px; font-size: 11px; }
+  .ctxb { display: flex; align-items: center; gap: 8px; } .ctxb .bullet { width: 64px; }
+  .tools2 { display: flex; gap: 4px; } .tools2 span { font-size: 10.5px; padding: 2px 6px; border-radius: 4px; background: var(--hair); color: var(--dim); } .tools2 span b { color: var(--txt); font-weight: 500; margin-left: 3px; }
+  .now2 { max-width: 210px; overflow: hidden; text-overflow: ellipsis; } .now2 b { color: var(--review); font-weight: 500; margin-right: 6px; }
+  @media (max-width: 1200px) { .g2, .g3 { grid-template-columns: minmax(0, 1fr); } }
+</style></head>
+<body>
+<script src="/assets/ao.js"></script>
+<script src="/assets/live.js"></script>
+<div class="wrap">
+  <div id="hdr"></div>
+  <div id="app"></div>
+</div>
+<script>
+// UI state lives outside render(): session id and view in the URL, feed filter in a variable, so live re-renders keep them.
+let feedKind = 'all';
+const viewMode = () => { const v = new URLSearchParams(location.search).get('v'); if (v === 'compact' || v === 'detail') return v; try { return localStorage.getItem('aoView') === 'detail' ? 'detail' : 'compact'; } catch (e) { return 'compact'; } };
+
+function render(D) {
+  const t = AO.t, q = new URLSearchParams(location.search);
+  document.getElementById('hdr').innerHTML = AO.header('session');
+  const app = document.getElementById('app');
+  const all = D.sessions, id = q.get('id');
+  const busy = s => s.agents.slice(1).some(a => a.status === 'run' || a.status === 'wait');
+  const S = id ? all.find(s => s.id === id) : (all.find(busy) || all[0]);
+  if (!S || !S.agents || !S.agents.length) {
+    app.innerHTML = AO.banner() + (id || all.length ? `<div class="panel"><div class="empty-state"><div class="big">∅</div><b>${AO.esc(t('x.notFound'))}</b><a class="act" href="/">← ${AO.esc(t('nav.sessions'))}</a></div></div>` : `<div class="panel">${AO.emptyState()}</div>`);
+    AO.init(); return;
+  }
+  const mode = viewMode();
+  const main = S.agents[0], subs = S.agents.slice(1);
+  const atok = a => a.tok.in + a.tok.out + a.tok.cw + a.tok.cr;
+  const rate = S.calls ? S.errs / S.calls : 0;
+  const writes = S.files.filter(f => f.ops.W || f.ops.E);
+  const lbl = a => a.key === 'main' ? t('r.main') : a.label;
+  const mdl = a => AO.esc(AO.model(a.model));
+
+  let h = AO.banner();
+  h += `<div class="shead"><div style="min-width:0"><div class="eyebrow"><a href="/">← ${t('nav.sessions')}</a></div>
+  <h1>${AO.esc(S.title)}</h1><div class="meta"><span class="mono">${AO.esc(S.short)}</span> · ${AO.esc(S.project)} · ${AO.esc(S.entry || '')} · ${AO.dt(S.t0)} → ${AO.time(S.t1)} · ${AO.dur(S.t1 - S.t0)}</div></div>
+  <div class="ml" style="display:flex;gap:8px;align-items:center">${AO.status(S.status)}${S.logDeleted ? `<span class="chip">${t('x.logDeleted')}</span>` : AO.resumeBtn(S, S.status === 'wait')}
+  <div class="seg" id="viewSeg"><button data-v="compact" class="${mode === 'compact' ? 'on' : ''}">${t('v.compact')}</button><button data-v="detail" class="${mode === 'detail' ? 'on' : ''}">${t('v.detail')}</button></div></div></div>`;
+
+  const ctxPct = main.ctx / 1e6;
+  h += `<div class="strip" style="--n:${mode === 'detail' ? 8 : 6}">
+  <div><div class="eyebrow">${t('k.tokens')}</div><div class="v">${AO.tok(S.tokTotal)}</div><div class="d">${t('k.cache').toLowerCase()} ${AO.pct(S.tokTotal ? S.tok.cr / S.tokTotal : 0, 0)}</div></div>
+  <div><div class="eyebrow" data-tip="${AO.tip(t('tip.cost'))}">${t('k.cost')} ⓘ</div><div class="v">${AO.usd(S.cost)}</div><div class="d">${t('k.subagents').toLowerCase()} ${AO.usd(S.subCost)}</div></div>
+  <div><div class="eyebrow" data-tip="${AO.tip(t('tip.ctx'))}">${t('k.context')} ⓘ</div><div class="v">${AO.tok(main.ctx)}<small>/ 1M</small></div><div class="d"><div class="bullet" style="width:90px;margin-top:6px"><i style="width:${ctxPct * 100}%;background:${ctxPct > .8 ? 'var(--bad)' : 'var(--gold)'}"></i><b style="left:80%"></b></div></div></div>
+  <div><div class="eyebrow">${t('p.agents')}</div><div class="v">${S.agents.length}</div><div class="d">${subs.filter(a => a.status === 'run').length} ${t('st.run').toLowerCase()}</div></div>
+  <div><div class="eyebrow">${t('k.calls')}</div><div class="v">${AO.n(S.calls)}</div><div class="d">${Object.keys(S.tools).length} tool</div></div>
+  <div><div class="eyebrow">${t('k.errors')}</div><div class="v" style="${S.errs > 20 && rate > .03 ? 'color:var(--bad)' : ''}">${AO.pct(rate)}</div><div class="d">${S.errs} / ${AO.n(S.calls)}</div></div>
+  ${mode === 'detail' ? `<div><div class="eyebrow">${t('k.files')}</div><div class="v">${writes.length}</div><div class="d" data-tip="${AO.tip(t('x.est'))}">+${AO.n(writes.reduce((x, f) => x + f.plus, 0))} −${AO.n(writes.reduce((x, f) => x + f.minus, 0))}</div></div>
+  <div><div class="eyebrow">${t('k.skills')} · MCP</div><div class="v">${new Set(S.skills.map(s => s.name)).size}<small>· ${Object.keys(S.mcp).length}</small></div><div class="d">${Object.values(S.mcp).reduce((x, m) => x + Object.values(m).reduce((y, z) => y + z, 0), 0)} MCP</div></div>` : ''}
+</div>`;
+
+  // token rows (stacked by type)
+  const tokPanel = `<section class="panel"><div class="ph"><h3>${t('p.tokens')}</h3><span class="r">${AO.tok(S.tokTotal)} · ${AO.usd(S.cost)}</span></div>
+  <div class="tokrows">${[...S.agents].sort((a, b) => atok(b) - atok(a)).slice(0, 10).map(a => { const tt = atok(a), mx = Math.max(...S.agents.map(atok), 1);
+    return `<div class="r"><span style="color:${a.key === 'main' ? 'var(--txt)' : 'var(--dim)'}" data-tip="${AO.tip(AO.esc(a.desc || t('r.main')))}">${AO.esc(lbl(a))} <span class="faint" style="font-size:11px">${AO.esc(AO.model(a.model).replace(/ .*/, ''))}</span></span>
+      <div class="stack" style="width:${Math.max(3, tt / mx * 100)}%" data-tip="${AO.tip(`${t('t.cr')} ${AO.tok(a.tok.cr)} · ${t('t.cw')} ${AO.tok(a.tok.cw)} · ${t('t.out')} ${AO.tok(a.tok.out)}`)}"><i style="flex:${a.tok.cr};background:color-mix(in srgb, ${AO.color(a)} 45%, transparent)"></i><i style="flex:${a.tok.cw};background:${AO.color(a)}"></i><i style="flex:${a.tok.out};background:var(--txt)"></i></div>
+      <span class="r num">${AO.tok(tt)}</span><span class="r num dim">${AO.usd(a.cost)}</span></div>`; }).join('')}
+    ${S.agents.length > 10 ? `<div class="faint" style="font-size:11.5px">+${S.agents.length - 10}</div>` : ''}</div>
+  <div class="legend"><span><i style="background:var(--hair2)"></i>${t('t.cr')}</span><span><i style="background:var(--gold)"></i>${t('t.cw')}</span><span><i style="background:var(--txt)"></i>${t('t.out')}</span></div></section>`;
+
+  // matrix agent × tool group
+  const groups = [['Bash', n => /^(Bash|PowerShell)$/.test(n)], ['Read', n => n === 'Read'], ['Edit', n => /^(Edit|Write|MultiEdit|NotebookEdit)$/.test(n)], ['Search', n => /^(Grep|Glob)$/.test(n)], ['MCP', n => n.startsWith('mcp__')], ['Agent', n => /^(Agent|SendMessage|SubagentHandback)$/.test(n)], ['Skill', n => n === 'Skill']];
+  const rows = [main, ...[...subs].sort((a, b) => b.calls - a.calls)].slice(0, 9);
+  const mat = rows.map(a => groups.map(([, f]) => (a.tools || []).filter(([n]) => f(n)).reduce((x, [, v]) => x + v, 0)));
+  const mx = Math.max(...mat.flat(), 1);
+  const matrix = `<section class="panel"><div class="ph"><h3>${t('p.matrix')}</h3><span class="r">${AO.n(S.calls)} ${t('c.calls').toLowerCase()}</span></div>
+  <div class="matrix" style="grid-template-columns:90px repeat(${groups.length}, minmax(0,1fr))"><span></span>${groups.map(([g]) => `<span class="h">${g.toUpperCase()}</span>`).join('')}
+  ${rows.map((a, i) => `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim)">${AO.esc(lbl(a))}</span>` + mat[i].map(v => { const s = v ? 5 + Math.sqrt(v / mx) * 15 : 2;
+    return `<span class="c" data-tip="${AO.tip(`<b>${v}</b>${AO.esc(lbl(a))}`)}"><i style="width:${s}px;height:${s}px;background:${v ? AO.color(a) : 'var(--hair2)'};opacity:${v ? .45 + .5 * Math.sqrt(v / mx) : 1}"></i></span>`; }).join('')).join('')}</div></section>`;
+
+  // timeline (zoom to sub-agent activity if any, else whole session)
+  const t0 = subs.length ? Math.min(...subs.map(a => a.t0)) - 5 * 60e3 : S.t0, t1 = S.t1 + 60e3, span = t1 - t0, P = ts => Math.max(0, Math.min(100, (ts - t0) / span * 100));
+  const phases = S.phases.filter(p => p.to > t0);
+  const tl = `<section class="panel"><div class="ph"><h3>${t('p.timeline')}</h3><span class="r">${AO.time(t0)} → ${AO.time(t1)}${subs.length ? ` · ${AO.lang === 'en' ? 'session started' : 'phiên bắt đầu'} ${AO.time(S.t0)}` : ''}</span></div>
+  <div class="tl">
+    ${phases.length ? `<div class="r"><span class="dim">${t('k.skills')}</span><div class="track">${phases.map(p => `<div class="skl" style="left:${P(p.from)}%;width:${P(p.to) - P(p.from)}%" data-tip="${AO.tip(`<b>${AO.esc(p.skill)}</b>${AO.time(p.from)}–${AO.time(p.to)} · ${p.calls} ${t('c.calls').toLowerCase()}`)}">${AO.esc(p.skill.replace('superpowers:', ''))}</div>`).join('')}</div><span></span></div>` : ''}
+    ${[main, ...subs].slice(0, 12).map(a => `<div class="r"><span>${a.key === 'main' ? `<b style="font-weight:500">${t('r.main')}</b>` : AO.esc(a.label)}</span><div class="track">
+      <div class="bar" style="left:${P(a.t0)}%;width:${Math.max(.8, P(a.t1) - P(a.t0))}%;background:${AO.color(a)};opacity:${a.status === 'run' || a.key === 'main' ? 1 : .7}" data-tip="${AO.tip(`${AO.esc(a.desc || t('r.main'))}<br>${AO.time(a.t0)}–${AO.time(a.t1)}`)}"></div>
+      ${a.key === 'main' ? S.spawns.filter(p => p.ts >= t0).map(p => `<i class="dia" style="left:${P(p.ts)}%;background:var(--worker)" data-tip="${AO.tip(`<b>${AO.time(p.ts)}</b>${AO.esc(p.desc)}`)}"></i>`).join('') + S.msgs.filter(m => m.ts >= t0).map(m => `<i class="dia" style="left:${P(m.ts)}%;background:var(--warn)" data-tip="${AO.tip(`<b>${AO.time(m.ts)} SendMessage</b>${AO.esc(m.text)}`)}"></i>`).join('') : ''}
+      </div><span class="r num dim">${AO.dur(a.t1 - a.t0)}</span></div>`).join('')}
+    ${S.agents.length > 12 ? `<div class="faint" style="font-size:11.5px;margin-left:132px">+${S.agents.length - 12}</div>` : ''}
+    <div class="axis"><span></span><div>${[0, .25, .5, .75, 1].map(f => `<span>${AO.time(t0 + f * span)}</span>`).join('')}</div><span></span></div>
+    <div class="legend"><span><i style="background:var(--worker);transform:rotate(45deg)"></i>${t('f.agent')}</span><span><i style="background:var(--warn);transform:rotate(45deg)"></i>SendMessage</span></div>
+  </div></section>`;
+
+  // activity feed with filters
+  const kinds = [['all', t('f.all')], ['tool', t('f.tool')], ['skill', t('f.skill')], ['mcp', t('f.mcp')], ['agent', t('f.agent')], ['err', t('f.err')]];
+  if (!kinds.some(([k]) => k === feedKind)) feedKind = 'all';
+  const feedHtml = k => S.events.filter(e => k === 'all' || (k === 'err' ? e.err : k === 'agent' ? /agent|msg|handback/.test(e.kind) : e.kind === k)).slice(0, mode === 'detail' ? 16 : 10).map(e => {
+    const a = S.agents.find(x => x.label === e.agent) || main;
+    return `<div class="ev ${e.err ? 'err' : ''}"><span class="faint mono" style="font-size:11px">${AO.time2(e.ts)}</span><span class="d" style="background:${AO.color(a)}"></span>
+    <span style="font-weight:500;overflow:hidden;text-overflow:ellipsis">${AO.esc(lbl(a))}</span><span class="k" style="${e.kind === 'mcp' ? 'color:var(--mcp)' : ''}">${AO.esc(e.tool.replace(/^mcp__[^_]+(_[^_]+)*__/, ''))}</span>
+    <span class="x" title="${AO.esc(e.text)}">${e.err ? '✕ ' : ''}${AO.esc(e.text)}</span><span class="r num faint" style="font-size:11px">${e.ms ? (e.ms < 1000 ? e.ms + 'ms' : AO.n(e.ms / 1000, 1) + 's') : ''}</span></div>`; }).join('') || `<div class="dim" style="padding:10px 0">—</div>`;
+  const feed = `<section class="panel"><div class="ph"><h3>${t('p.activity')}</h3><span class="r">${S.events.length}</span></div>
+  <div class="feedf" id="feedf">${kinds.map(([k, l]) => `<button class="chip ${k === feedKind ? 'on' : ''}" data-k="${k}">${l}</button>`).join('')}</div><div id="feed">${feedHtml(feedKind)}</div></section>`;
+
+  if (mode === 'compact') {
+    h += `<div class="g2"><section class="panel"><div class="ph"><h3>${t('p.orbit')}</h3><span class="r">${subs.length} ${t('k.subagents').toLowerCase()}</span></div>${AO.orbit(S, { size: 440 })}
+    <div class="legend" style="justify-content:center"><span><i style="background:var(--gold)"></i>${t('r.main')}</span><span><i style="background:var(--worker)"></i>${t('r.worker')}</span><span><i style="background:var(--review)"></i>${t('r.review')}</span></div></section>
+    <div class="grid">${tokPanel}${matrix}</div></div>
+    <div class="g2">${tl}${feed}</div>`;
+  } else {
+    // agent table
+    const at = `<section class="panel"><div class="ph"><h3>${t('p.agents')}</h3><span class="r">${S.agents.length}</span></div><div style="overflow-x:auto"><table>
+    <thead><tr><th>${t('c.agent')}</th><th>${t('c.status')}</th><th>${t('c.model')}</th><th>${t('c.doing')}</th><th data-tip="${AO.tip(t('tip.ctx'))}">${t('k.context')}</th><th>${t('k.tokens')}</th><th class="r">${t('k.cost')}</th><th>${t('c.tools')}</th><th class="r">${t('p.files')}</th><th class="r">${t('c.errs')}</th><th class="r">${t('c.time')}</th></tr></thead><tbody>
+    ${[main, ...subs].slice(0, 25).map(a => { const tt = atok(a), mxT = Math.max(...S.agents.map(atok), 1);
+      return `<tr><td><div style="display:flex;align-items:center;gap:9px"><span style="width:8px;height:8px;border-radius:50%;background:${AO.color(a)};flex:none"></span><div style="min-width:0"><b style="font-weight:500">${AO.esc(lbl(a))}</b><div class="faint" style="font-size:11px;max-width:190px;overflow:hidden;text-overflow:ellipsis">${AO.esc(a.desc || (S.skills.length ? '✦ ' + S.skills[S.skills.length - 1].name : ''))}</div></div></div></td>
+      <td>${AO.status(a.status)}</td><td class="dim">${mdl(a)}</td>
+      <td><div class="now2">${a.now ? `<b>${AO.esc(a.now.tool.replace(/^mcp__/, ''))}</b><span class="dim">${AO.esc(a.now.text)}</span>` : '—'}</div></td>
+      <td><div class="ctxb"><div class="bullet"><i style="width:${a.ctx / 1e6 * 100}%;background:${AO.color(a)}"></i><b style="left:80%"></b></div><span class="num dim">${AO.tok(a.ctx)}</span></div></td>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="stack" style="width:${Math.max(6, tt / mxT * 90)}px"><i style="flex:${a.tok.cr};background:color-mix(in srgb, ${AO.color(a)} 45%, transparent)"></i><i style="flex:${a.tok.cw};background:${AO.color(a)}"></i><i style="flex:${a.tok.out};background:var(--txt)"></i></div><span class="num">${AO.tok(tt)}</span></div></td>
+      <td class="r">${AO.usd(a.cost)}</td>
+      <td><div class="tools2">${(a.tools || []).slice(0, 3).map(([n, v]) => `<span style="${n.startsWith('mcp__') ? 'color:var(--mcp)' : ''}">${AO.esc(n.startsWith('mcp__') ? n.split('__')[1].replace('claude_ai_', '') : n)}<b>${AO.esc(v)}</b></span>`).join('')}${(a.tools || []).length > 3 ? `<span>+${a.tools.length - 3}</span>` : ''}</div></td>
+      <td class="r">${a.files ? AO.esc(a.files) : '<span class="faint">—</span>'}</td><td class="r">${a.errs ? (a.errs > 10 ? `<span class="flag bad">${a.errs}</span>` : a.errs) : '<span class="faint">—</span>'}</td><td class="r dim">${AO.dur(a.t1 - a.t0)}</td></tr>`; }).join('')}
+    </tbody></table>${S.agents.length > 25 ? `<div class="faint" style="padding:8px">+${S.agents.length - 25}</div>` : ''}</div></section>`;
+    // phases
+    const ph = `<section class="panel"><div class="ph"><h3>${t('p.phases')}</h3><span class="r">${S.phases.length}</span></div>
+    ${S.phases.length ? `<div class="steps">${S.phases.map((p, i) => `<div class="step ${i === S.phases.length - 1 && S.status !== 'stop' ? 'cur' : ''}"><div class="h"><b title="${AO.esc(p.skill)}">${AO.esc(p.skill)}</b><span class="faint num" style="font-size:11.5px;white-space:nowrap">${AO.time(p.from)} · ${AO.dur(p.to - p.from)}</span></div>
+      <div class="f"><span><b>${p.calls}</b> ${t('c.calls').toLowerCase()}</span>${p.written ? `<span><b>${p.written}</b> file</span>` : ''}${p.spawns ? `<span><b>${p.spawns}</b> ${t('k.subagents').toLowerCase()}</span>` : ''}${p.mcp ? `<span style="color:var(--mcp)"><b>${p.mcp}</b> MCP</span>` : ''}${p.errs ? `<span style="color:var(--bad)"><b>${p.errs}</b> ${t('c.errs').toLowerCase()}</span>` : ''}</div></div>`).join('')}</div>` : `<div class="dim">—</div>`}
+    <div style="border-top:1px solid var(--hair);padding-top:10px;display:grid;gap:6px;font-size:12px">
+      ${Object.entries(S.hooks).map(([k, v]) => `<div style="display:flex;justify-content:space-between"><span>⚡ Hook ${AO.esc(k)}</span><span class="dim">${AO.esc(v)}×</span></div>`).join('')}
+      <div style="display:flex;justify-content:space-between"><span>📎 Memory</span><span class="dim">${AO.esc(S.memReads)} file</span></div>
+      <div style="display:flex;justify-content:space-between"><span>🧩 ToolSearch</span><span class="dim">${AO.esc(S.toolSearch)}×</span></div></div></section>`;
+    // tools grouped
+    const tg = [['Built-in', n => !n.startsWith('mcp__') && !/^(Agent|SendMessage|SubagentHandback|Skill|ToolSearch)$/.test(n)], [AO.lang === 'en' ? 'Coordination' : 'Điều phối', n => /^(Agent|SendMessage|SubagentHandback|Skill|ToolSearch)$/.test(n)]];
+    const tmax = Math.max(...Object.values(S.tools).map(x => x.n), 1);
+    const tools = `<section class="panel"><div class="ph"><h3>${t('p.tools')}</h3><span class="r">${t('c.calls')} · ${t('c.errs')} · ${t('c.avg')}</span></div>
+    ${tg.map(([g, f]) => { const rs = Object.entries(S.tools).filter(([n]) => f(n)).sort((a, b) => b[1].n - a[1].n).slice(0, 7); if (!rs.length) return '';
+      return `<div class="grp"><span>${g}</span><span>${rs.reduce((x, [, v]) => x + v.n, 0)}</span></div>` + rs.map(([n, v]) => `<div class="trow"><span>${AO.esc(n)}</span><div class="share"><i style="width:${v.n / tmax * 100}%;background:${g === 'Built-in' ? 'var(--review)' : 'var(--gold)'}"></i></div><span class="r num">${v.n}</span>
+        <span class="r num">${v.err ? (v.err / v.n > .1 && v.n >= 10 ? `<span class="flag bad">${AO.pct(v.err / v.n, 0)}</span>` : `<span class="dim">${v.err}</span>`) : '<span class="faint">—</span>'}</span><span class="r num faint">${v.msN ? (v.ms / v.msN < 1000 ? Math.round(v.ms / v.msN) + 'ms' : AO.n(v.ms / v.msN / 1000, 1) + 's') : ''}</span></div>`).join(''); }).join('')}
+    ${Object.entries(S.mcp).map(([sv, ts]) => `<div class="grp" style="color:var(--mcp)"><span>MCP · ${AO.esc(sv.replace('claude_ai_', ''))}</span><span>${Object.values(ts).reduce((x, y) => x + y, 0)}</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">${Object.entries(ts).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<span class="mc">${AO.esc(k)} <b style="color:var(--txt);font-weight:500">${AO.esc(v)}</b></span>`).join('')}</div>`).join('')}</section>`;
+    const files = `<section class="panel"><div class="ph"><h3>${t('p.files')}</h3><span class="r">W · E · R</span></div>
+    ${S.files.slice(0, 12).map(f => { const op = f.ops.W ? 'W' : f.ops.E ? 'E' : 'R';
+      return `<div class="file"><span class="op ${op}">${op}</span><span class="p" title="${AO.esc(f.dir + '/' + f.name)}">${AO.esc(f.name)}<em>${AO.esc(f.dir)}</em></span><span class="faint" style="font-size:11px;white-space:nowrap">${AO.esc(f.agents.map(x => x === 'main' ? t('r.main') : x).join(', '))}${f.n > 1 ? ' · ' + AO.esc(f.n) + '×' : ''}</span></div>`; }).join('') || '<div class="dim">—</div>'}
+    ${S.files.length > 12 ? `<div class="faint" style="font-size:11.5px;margin-top:4px">+${S.files.length - 12}</div>` : ''}</section>`;
+    h += at + `<div class="g3">${ph}${tools}${files}</div><div class="g2">${tl}${feed}</div>`;
+  }
+  app.innerHTML = h;
+  document.getElementById('viewSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; try { localStorage.setItem('aoView', b.dataset.v); } catch (x) {} const u = new URL(location.href); u.searchParams.set('v', b.dataset.v); u.searchParams.set('id', S.id); location.href = u.href; };
+  document.getElementById('feedf').onclick = e => { const b = e.target.closest('button'); if (!b) return; feedKind = b.dataset.k; document.querySelectorAll('#feedf .chip').forEach(x => x.classList.toggle('on', x === b)); document.getElementById('feed').innerHTML = feedHtml(feedKind); };
+  AO.init();
+}
+AO.live(render);
+</script>
+</body>
+</html>

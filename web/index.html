@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Ops</title>
+<link rel="stylesheet" href="/assets/ao.css">
+<style>
+  /* Question: "what is running, does anything need me, and where did the effort go?" */
+  .live { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-bottom: 16px; }
+  .card { position: relative; padding: 14px 16px 12px; border-radius: 12px; background: var(--panel); border: 1px solid var(--hair); display: flex; flex-direction: column; gap: 8px; min-width: 0; transition: border-color .25s; }
+  .card:hover { border-color: color-mix(in srgb, var(--gold) 40%, transparent); }
+  .card.wait { border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+  .card .top { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--dim); }
+  .card h4 { font-size: 14px; font-weight: 500; line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; min-height: 38px; }
+  .card .mid { display: grid; grid-template-columns: 92px 1fr; gap: 12px; align-items: center; }
+  .card .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+  .card .kv span { font-size: 10px; letter-spacing: .14em; color: var(--dim); text-transform: uppercase; }
+  .card .kv b { display: block; font-size: 17px; font-weight: 300; letter-spacing: 0; text-transform: none; color: var(--txt); font-variant-numeric: tabular-nums; }
+  .card .doing { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-top: 1px solid var(--hair); padding-top: 8px; }
+  .card .doing b { color: var(--txt); font-weight: 500; margin-right: 6px; }
+  .card .acts { display: flex; gap: 6px; }
+  .row2 { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr); gap: 16px; margin-bottom: 16px; align-items: start; }
+  .conc { display: flex; align-items: flex-end; gap: 2px; height: 30px; margin: 0 0 6px 170px; }
+  .conc i { flex: 1; border-radius: 2px 2px 0 0; background: color-mix(in srgb, var(--gold) 35%, transparent); }
+  .lane { display: grid; grid-template-columns: 160px 1fr; gap: 10px; align-items: center; height: 24px; }
+  .lane > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+  .lane .tr { position: relative; height: 14px; }
+  .lane .tr::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--hair); }
+  .lane .tr i { position: absolute; top: 4px; height: 6px; border-radius: 6px; }
+  .lane .tr u { position: absolute; top: 1px; width: 2px; height: 12px; background: var(--worker); border-radius: 1px; }
+  .axis { display: flex; justify-content: space-between; margin-left: 170px; font-size: 10.5px; color: var(--faint); margin-top: 6px; }
+  .nowl { position: absolute; top: -4px; bottom: -4px; width: 1px; background: var(--gold); opacity: .7; }
+  .att { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; }
+  .att .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+  .att > div { display: contents; }
+  .att .sep { grid-column: 1 / -1; border-top: 1px solid var(--hair); }
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 96px; margin-top: 6px; }
+  .bars > div { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .bars i { display: block; border-radius: 3px 3px 0 0; background: color-mix(in srgb, var(--gold) 55%, transparent); transform-origin: bottom; animation: rise 1s cubic-bezier(.16,1,.3,1) both; }
+  .bars i.today { background: none; border: 1px dashed var(--gold); border-bottom: 0; }
+  .bax { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--faint); margin-top: 4px; }
+  .tok2 { display: flex; height: 6px; width: 120px; border-radius: 6px; overflow: hidden; background: var(--hair); }
+  @media (max-width: 1100px) { .row2 { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 640px) { .lane { grid-template-columns: 100px 1fr; } .conc, .axis { margin-left: 110px; } .hide-s { display: none; } }
+</style></head>
+<body>
+<script src="/assets/ao.js"></script>
+<script src="/assets/live.js"></script>
+<div class="wrap">
+  <div id="hdr"></div>
+  <div id="app"></div>
+</div>
+<script>
+// UI state lives outside render() (and the project filter in the URL) so live re-renders keep it.
+let sortBy = 't1', dir = -1;
+const href = s => '/session.html?id=' + AO.esc(encodeURIComponent(s.id));
+
+function render(D) {
+  const t = AO.t, NOW = AO.NOW, W = AO.win(), PW = AO.prevWin();
+  document.getElementById('hdr').innerHTML = AO.header('index');
+  const all = AO.list(W), prev = AO.state === 'empty' ? [] : AO.sessions(PW);
+  const projects = [...new Set(all.map(s => s.project))].map(p => [p, all.filter(s => s.project === p).length]).sort((a, b) => b[1] - a[1]);
+  const proj = new URLSearchParams(location.search).get('p');
+  const list = proj ? all.filter(s => s.project === proj) : all;
+  const live = list.filter(s => !s.logDeleted);
+  const cur = AO.sumDays(list, W), before = AO.sumDays(prev, PW);
+  const tokIn = (l, w) => l.reduce((x, s) => x + Object.entries(s.byDay).filter(([d]) => d >= AO.dayKey(w[0]) && d <= AO.dayKey(w[1])).reduce((y, [, v]) => y + (v.tok || 0), 0), 0);
+  const tokNow = tokIn(list, W), tokPrev = tokIn(prev, PW);
+  const calls = list.reduce((x, s) => x + s.calls, 0), errs = list.reduce((x, s) => x + s.errs, 0);
+  const run = list.filter(s => s.status === 'run'), wait = list.filter(s => s.status === 'wait');
+  const delta = (a, b) => !b || b < 1e-9 ? `<span class="faint">${t('vs.prev')}: —</span>` : `${a >= b ? '▲' : '▼'} ${AO.pct(Math.abs(a - b) / b, 0)} <span class="faint">${AO.range === 'today' ? t('vs.yesterday') : t('vs.prev')}</span>`;
+
+  let html = AO.banner();
+  html += `<div class="toolbar"><a class="chip ${proj ? '' : 'on'}" href="?">${t('f.all')}<b>${all.length}</b></a>${projects.map(([p, n]) => `<a class="chip ${proj === p ? 'on' : ''}" href="?p=${AO.esc(encodeURIComponent(p))}">${AO.esc(p)}<b>${n}</b></a>`).join('')}</div>`;
+  const app = document.getElementById('app');
+  if (!list.length) { html += `<div class="panel">${AO.emptyState()}</div>`; app.innerHTML = html; AO.init(); return; }
+
+  html += `<div class="strip" style="--n:6">
+  <div><div class="eyebrow">${t('k.running')}</div><div class="v">${run.length}</div><div class="d">${AO.n(list.filter(s => NOW - s.t1 < 3600e3).length)} / 1h</div></div>
+  <div><div class="eyebrow">${t('k.waiting')}</div><div class="v" style="${wait.length ? 'color:var(--warn)' : ''}">${wait.length}</div><div class="d">${wait[0] ? AO.ago(wait[0].t1) : '—'}</div></div>
+  <div><div class="eyebrow">${t('k.sessions')}</div><div class="v">${list.length}</div><div class="d">${delta(list.length, prev.length)}</div></div>
+  <div><div class="eyebrow">${t('k.tokens')}</div><div class="v">${AO.tok(tokNow)}</div><div class="d">${delta(tokNow, tokPrev)}</div></div>
+  <div><div class="eyebrow" data-tip="${AO.tip(t('tip.cost'))}">${t('k.cost')} ⓘ</div><div class="v">${AO.usd(cur.cost)}</div><div class="d">${delta(cur.cost, before.cost)}</div></div>
+  <div><div class="eyebrow">${t('k.errors')}</div><div class="v">${AO.pct(calls ? errs / calls : 0)}</div><div class="d">${AO.n(errs)} / ${AO.n(calls)}</div></div>
+</div>`;
+
+  // active now: running + needs-you + active in last 2h (max 6)
+  const active = live.filter(s => s.status !== 'stop').concat(live.filter(s => s.status === 'stop' && NOW - s.t1 < 2 * 3600e3)).slice(0, 6);
+  html += `<div class="ph" style="margin:4px 2px 10px"><h3>${t('p.live')}</h3><span class="r">${active.length}</span></div><div class="live">` + active.map(s => {
+    const last = s.events[0], sk = s.skills.length ? s.skills[s.skills.length - 1].name.replace('superpowers:', '') : null, mcp = Object.keys(s.mcp);
+    return `<div class="card ${AO.esc(s.status)}">
+    <div class="top">${AO.status(s.status)}<span class="ml">${AO.ago(s.t1)}</span></div>
+    <h4>${AO.esc(s.title)}</h4>
+    <div class="faint mono" style="font-size:11px;margin-top:-4px">${AO.esc(s.short)} · ${AO.esc(s.project)}</div>
+    <div class="mid">${AO.orbit(s, { size: 92, mini: true, maxPer: 5 })}
+      <div class="kv"><span>${t('k.tokens')}<b>${AO.tok(s.tokTotal)}</b></span><span data-tip="${AO.tip(t('tip.cost'))}">${t('k.cost')}<b>${AO.usd(s.cost)}</b></span>
+      <span>${t('k.duration')}<b>${AO.dur(s.t1 - s.t0)}</b></span><span>${t('k.errors')}<b style="${s.errs > 20 ? 'color:var(--bad)' : ''}">${s.errs}</b></span></div></div>
+    <div>${sk ? `<span class="skc">${AO.esc(sk)}</span>` : ''}${mcp.map(m => `<span class="mc">${AO.esc(m.replace('claude_ai_', ''))}</span>`).join('')}</div>
+    <div class="doing">${last ? `<b>${AO.esc(last.agent === 'main' ? t('r.main') : last.agent)}</b>${AO.esc(last.tool)} · ${AO.esc(last.text)}` : '—'}</div>
+    <div class="acts"><a class="act" href="${href(s)}">${t('a.open')} ↗</a>${AO.resumeBtn(s, s.status === 'wait')}</div>
+  </div>`; }).join('') + `</div>`;
+
+  // parallel today (15-min bins, from 07:00 local, or midnight when it is still early)
+  let dayStart = AO.dayStart(NOW) + 7 * 3600e3; if (NOW - dayStart < 3600e3) dayStart = AO.dayStart(NOW);
+  const bins = Math.max(4, Math.ceil((NOW - dayStart) / 900e3));
+  const today = AO.sessions([dayStart, NOW]).filter(s => !s.logDeleted && s.activity.some(b => b * 900e3 >= dayStart));
+  const pos = ts => ((ts - dayStart) / (NOW - dayStart) * 100);
+  const conc = Array.from({ length: bins }, (_, i) => today.filter(s => s.activity.includes(Math.floor(dayStart / 900e3) + i)).length);
+  const maxC = Math.max(...conc, 1);
+  const lanes = today.slice(0, 9).map(s => {
+    const b = s.activity.filter(x => x * 900e3 >= dayStart).sort((p, q) => p - q), segs = [];
+    for (const x of b) { const l = segs[segs.length - 1]; if (l && x - l[1] <= 1) l[1] = x; else segs.push([x, x]); }
+    const col = s.status === 'wait' ? 'var(--warn)' : s.status === 'run' ? 'var(--ok)' : 'var(--gold)';
+    return `<div class="lane"><span title="${AO.esc(s.title)}">${AO.esc(s.title)}</span><div class="tr">${segs.map(([a, z]) => `<i style="left:${pos(a * 900e3)}%;width:${Math.max(.6, pos((z + 1) * 900e3) - pos(a * 900e3))}%;background:${col}" data-tip="${AO.tip(AO.time(a * 900e3) + '–' + AO.time((z + 1) * 900e3))}"></i>`).join('')}
+    ${s.spawns.filter(p => p.ts >= dayStart).map(p => `<u style="left:${pos(p.ts)}%" data-tip="${AO.tip(`<b>${AO.time(p.ts)}</b>${AO.esc(p.desc)} · ${AO.esc(p.model || '')}`)}"></u>`).join('')}</div></div>`; }).join('');
+  const ticks = [0, .25, .5, .75, 1].map(f => AO.time(dayStart + f * (NOW - dayStart)));
+
+  // needs attention: flags on data + action
+  const att = live.map(s => { const fl = [];
+    if (s.status === 'wait') fl.push(`<span class="flag warn">${t('st.wait')}</span>`);
+    for (const [lv, txt] of AO.problems(s)) fl.push(`<span class="flag ${AO.esc(lv)}">${AO.esc(txt)}</span>`);
+    return fl.length ? [s, `<span style="display:flex;gap:4px">${fl.join('')}</span>`, '', s.status === 'wait' ? AO.resumeBtn(s, true) : `<a class="act" href="${href(s)}">${t('a.open')} ↗</a>`] : null; }).filter(Boolean).slice(0, 7);
+
+  // by day tokens
+  const days = []; for (let d = AO.win()[0]; d <= NOW; d += 864e5) days.push(AO.dayKey(d));
+  const perDay = days.map(d => list.reduce((x, s) => x + (s.byDay[d] ? s.byDay[d].tok : 0), 0)), maxD = Math.max(...perDay, 1);
+
+  html += `<div class="row2">
+  <section class="panel" style="position:relative"><div class="ph"><h3>${t('p.parallel')}</h3><span class="r">${AO.lang === 'en' ? 'peak' : 'cao nhất'} ${maxC} · ${today.length} ${t('k.sessions').toLowerCase()}</span></div>
+    <div class="conc">${conc.map(c => `<i style="height:${c / maxC * 100}%;${c === maxC ? 'background:var(--gold)' : ''}" data-tip="${c}"></i>`).join('')}</div>
+    <div style="position:relative">${lanes}</div>
+    <div class="axis">${ticks.map(x => `<span>${x}</span>`).join('')}</div></section>
+  <div class="grid">
+    <section class="panel"><div class="ph"><h3>${t('p.attention')}</h3><span class="r">${att.length}</span></div>
+      <div class="att">${att.length ? att.map(([s, f, m, a], i) => `${i ? '<span class="sep"></span>' : ''}${f}<a class="t" href="${href(s)}" title="${AO.esc(s.title)}">${AO.esc(s.title)}</a>${a}`).join('') : `<span class="dim">✓</span>`}</div></section>
+    <section class="panel"><div class="ph"><h3>${t('p.byday')}</h3><span class="r">${t('k.tokens')}</span></div>
+      <div class="bars">${perDay.map((v, i) => `<div><i class="${i === perDay.length - 1 ? 'today' : ''}" style="height:${Math.max(v ? 3 : 0, v / maxD * 100)}%;animation-delay:${i * 25}ms" data-tip="${AO.tip(`<b>${AO.tok(v)}</b>${days[i].slice(8)}/${days[i].slice(5, 7)}`)}"></i></div>`).join('')}</div>
+      <div class="bax"><span>${days[0].slice(8)}/${days[0].slice(5, 7)}</span><span>${AO.date(NOW)}</span></div></section>
+  </div></div>`;
+
+  // all sessions table (sortable)
+  const cols = [['status', t('c.status')], ['title', t('c.session')], ['src', t('c.source'), 'hide-s'], ['t0', t('c.started'), 'hide-s'], ['dur', t('k.duration'), 'r hide-s'], ['agents', t('p.agents'), 'r'], ['tok', t('k.tokens')], ['cost', t('k.cost'), 'r'], ['skills', t('k.skills'), 'hide-s'], ['mcp', 'MCP', 'hide-s'], ['errs', t('k.errors'), 'r'], ['t1', t('c.last'), 'r'], ['act', '']];
+  const key = { dur: s => s.t1 - s.t0, agents: s => s.agents.length, tok: s => s.tokTotal, cost: s => s.cost, errs: s => s.errs, t0: s => s.t0, t1: s => s.t1, title: s => s.title, src: s => s.source || '', status: s => ({ run: 0, wait: 1, stop: 2 })[s.status] };
+  const table = () => {
+    const rows = [...list].sort((a, b) => { const k = key[sortBy] || key.t1, x = k(a), y = k(b); return (x > y ? 1 : x < y ? -1 : 0) * dir; });
+    const maxTok = Math.max(...list.map(s => s.tokTotal), 1);
+    return `<table><thead><tr>${cols.map(([k, l, c]) => `<th class="${c || ''} ${key[k] ? 'sort' : ''} ${k === sortBy ? 'sorted' : ''}" data-k="${k}">${l}${k === sortBy ? (dir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('')}</tr></thead><tbody>` +
+      rows.slice(0, 40).map(s => { const mt = s.agents[0].tok, mainTok = mt.in + mt.out + mt.cw + mt.cr, rate = s.calls ? s.errs / s.calls : 0, flagged = s.errs > 20 && rate > .03;
+        const sk = [...new Set(s.skills.map(x => x.name.replace('superpowers:', '')))];
+        return `<tr class="click" data-href="${href(s)}">
+      <td>${AO.status(s.status)}</td>
+      <td><span class="ttl" title="${AO.esc(s.title)}">${AO.esc(s.title)}<em class="mono">${AO.esc(s.short)} · ${AO.esc(s.project)}</em></span></td>
+      <td class="hide-s">${AO.sourceBadge(s)}</td>
+      <td class="dim hide-s">${AO.dt(s.t0)}</td><td class="r dim hide-s">${AO.dur(s.t1 - s.t0)}</td>
+      <td class="r">${s.agents.length > 1 ? `1 + <span style="color:var(--worker)">${s.agents.length - 1}</span>` : '<span class="dim">1</span>'}</td>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="tok2" style="width:${Math.max(8, s.tokTotal / maxTok * 120)}px" data-tip="${AO.tip(`${t('r.main')} ${AO.tok(mainTok)} · ${t('k.subagents').toLowerCase()} ${AO.tok(s.tokTotal - mainTok)}`)}"><i style="flex:${mainTok};background:var(--gold)"></i><i style="flex:${s.tokTotal - mainTok};background:var(--worker)"></i></div><span class="num">${AO.tok(s.tokTotal)}</span></div></td>
+      <td class="r">${AO.usd(s.cost)}</td>
+      <td class="hide-s">${sk.slice(0, 1).map(x => `<span class="skc">${AO.esc(x)}</span>`).join('')}${sk.length > 1 ? `<span class="faint" data-tip="${AO.tip(AO.esc(sk.slice(1).join(', ')))}">+${sk.length - 1}</span>` : ''}</td>
+      <td class="hide-s">${Object.keys(s.mcp).map(m => `<span class="mc">${AO.esc(m.replace('claude_ai_', ''))}</span>`).join('') || '<span class="faint">—</span>'}</td>
+      <td class="r">${s.errs ? (flagged ? `<span class="flag bad">${s.errs} · ${AO.pct(rate)}</span>` : `<span class="dim">${s.errs}</span>`) : '<span class="faint">—</span>'}</td>
+      <td class="r dim">${AO.ago(s.t1)}</td>
+      <td class="r">${s.logDeleted ? `<span class="chip">${t('x.logDeleted')}</span>` : `<button class="act" data-resume="${AO.esc(s.id)}" data-tip="${AO.tip(t('a.resume'))}">⧉</button>`}</td></tr>`; }).join('') + `</tbody></table>` +
+      (rows.length > 40 ? `<div class="faint" style="padding:10px 8px">+${rows.length - 40}</div>` : '');
+  };
+  html += `<section class="panel"><div class="ph"><h3>${t('p.all')}</h3><span class="r">${list.length}</span></div><div id="tbl" style="overflow-x:auto">${table()}</div></section>`;
+  app.innerHTML = html;
+  const tbl = document.getElementById('tbl');
+  tbl.addEventListener('click', e => {
+    const th = e.target.closest('th.sort');
+    if (th) { if (sortBy === th.dataset.k) dir = -dir; else { sortBy = th.dataset.k; dir = -1; } tbl.innerHTML = table(); return; }
+    if (e.target.closest('[data-resume]')) return;
+    const tr = e.target.closest('tr[data-href]'); if (tr) location.href = tr.dataset.href;
+  });
+  AO.init();
+}
+AO.live(render);
+</script>
+</body>
+</html>

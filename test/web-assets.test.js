@@ -134,3 +134,19 @@ test('AO.live: initial render, debounced refetch, error then recovery', async ()
   assert.notEqual(AO.state, 'error');
   assert.equal(renders, 4);
 });
+
+test('pages: sessions and session run on live data', () => {
+  for (const [f, key] of [['index.html', 'index'], ['session.html', 'session']]) {
+    const h = read(f);
+    assert.ok(h.includes('AO.live('), f + ' uses AO.live');
+    assert.ok(!h.includes('AO_DATA') && !h.includes('ao-data.js'), f + ' has no mock data');
+    assert.ok(!/https?:\/\//.test(h), f + ' has no external url');
+    assert.ok(!h.includes('/files/'), f + ' has no mockup links');
+    assert.ok(!h.includes('throw 0'), f + ' has no throw 0');
+    assert.ok(h.includes('/assets/ao.css') && h.includes('/assets/ao.js') && h.includes('/assets/live.js'));
+    assert.ok(h.includes(`AO.header('${key}')`), f + ' header key');
+  }
+  const idx = read('index.html'), ses = read('session.html');
+  assert.ok(idx.includes('c.source') && idx.includes('x.logDeleted') && idx.includes('AO.sourceBadge'));
+  assert.ok(ses.includes('x.notFound') && ses.includes('AO.emptyState'));
+});
