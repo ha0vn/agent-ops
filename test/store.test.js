@@ -191,3 +191,10 @@ test('snapshot shape', () => {
   ];
   assert.deepEqual(Object.keys(find(snap, 's1')).sort(), expected.slice().sort());
 });
+
+test('setConfig changes what the next snapshot reports', () => {
+  const store = mk();
+  store.refresh(NOW);
+  store.setConfig({ ...store.config, budget: 123 });
+  assert.equal(store.snapshot(NOW).config.budget, 123);
+});

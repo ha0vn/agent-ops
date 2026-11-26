@@ -54,6 +54,9 @@ export class Store extends EventEmitter {
     } catch { /* no history yet */ }
   }
 
+  // Replace the config reported by snapshot(); scanners keep construction-time config (repricing is a later task).
+  setConfig(config) { this.config = config; }
+
   _histFile() { return path.join(this.stateDir, 'history.json'); }
 
   _saveHistory() {
