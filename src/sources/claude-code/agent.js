@@ -39,7 +39,7 @@ export function createAgent() {
     t0: null, t1: null, tok: zero(), cost: 0, costByType: zero(), byModel: {}, ctx: 0,
     tools: {}, errs: 0, files: {}, skills: [], mcp: {}, events: [], spawns: [], msgs: [],
     title: null, cwd: null, entry: null, model: null, hooks: {}, memReads: 0, toolSearch: 0, turns: 0,
-    lastAssistant: null, lastUserAfter: false, pending: {}, byDay: {}, lastTool: null, activity: [], bad: 0,
+    lastAssistant: null, lastUserAfter: false, pending: {}, byDay: {}, lastTool: null, activity: [], bad: 0, tokByDayModel: {},
   };
   Object.defineProperty(st, '_seen', { value: new Set(), enumerable: false });
   Object.defineProperty(st, '_ev', { value: new Map(), enumerable: false });
@@ -73,6 +73,24 @@ function applyUsage(st, m, ts, prices) {
     dayBucket(st, ts).tok += tokSum;
   }
   if (ts) st.activity.push(ts);
+  const dm = ((st.tokByDayModel[dayKey(ts || Date.now())] = st.tokByDayModel[dayKey(ts || Date.now())] || {})[mk] = st.tokByDayModel[dayKey(ts || Date.now())][mk] || zero());
+  for (const k of TYPES) dm[k] += uu[k];
+}
+
+// Recompute every price-derived field from cached token counts (no log re-read).
+export function repriceAgent(st, prices) {
+  st.cost = 0; st.costByType = zero(); st.byDay = {};
+  for (const bm of Object.values(st.byModel)) bm.cost = 0;
+  for (const [d, models] of Object.entries(st.tokByDayModel)) {
+    const bd = (st.byDay[d] = { in: 0, out: 0, cw: 0, cr: 0, tok: 0 });
+    for (const [mk, uu] of Object.entries(models)) {
+      bd.tok += uu.in + uu.out + uu.cw + uu.cr;
+      const c = costOf(mk, uu, prices);
+      if (c == null) continue;
+      st.cost += c; st.byModel[mk].cost += c;
+      for (const k of TYPES) { const v = uu[k] * prices[mk][k] / 1e6; st.costByType[k] += v; bd[k] += v; }
+    }
+  }
 }
 
 function applyToolUse(st, c, ts) {

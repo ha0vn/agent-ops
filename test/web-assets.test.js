@@ -150,3 +150,15 @@ test('pages: sessions and session run on live data', () => {
   assert.ok(idx.includes('c.source') && idx.includes('x.logDeleted') && idx.includes('AO.sourceBadge'));
   assert.ok(ses.includes('x.notFound') && ses.includes('AO.emptyState'));
 });
+
+test('skills and cost pages follow the live-page contract', () => {
+  for (const [p, nav] of [['skills.html', 'skills'], ['cost.html', 'cost']]) {
+    const h = read(p);
+    for (const need of ['/assets/ao.css', '/assets/ao.js', '/assets/live.js', `AO.header('${nav}')`, 'AO.live(']) assert.ok(h.includes(need), `${p} lacks ${need}`);
+    assert.ok(!h.includes('/files/') && !h.includes('throw 0') && !h.includes('ao-data.js'), p);
+    const m = h.match(/<script>\s*\n([\s\S]*)<\/script>/);
+    assert.doesNotThrow(() => new vm.Script(m[1]), p);
+    for (const tip of h.match(/data-tip="[^"]*"/g) || []) assert.ok(/data-tip="\$\{AO\.tip\(/.test(tip) || !/<\w/.test(tip), `${p}: ${tip}`);
+  }
+  assert.match(read('cost.html'), /type="number" step="0\.01"/);
+});
