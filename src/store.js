@@ -47,6 +47,7 @@ export class Store extends EventEmitter {
     this.scanners = new Map(SOURCES.filter((s) => s.detect(env)).map((s) => [s.id, s.createScanner(env, this.config, { readNew })]));
     this.history = new Map();
     this.refreshed = false;
+    this.sources = listSources(env);
     try {
       const arr = JSON.parse(fs.readFileSync(this._histFile(), 'utf8'));
       if (Array.isArray(arr)) for (const s of arr) if (s && s.id) this.history.set(s.id, s);
@@ -71,6 +72,7 @@ export class Store extends EventEmitter {
       changed.push(...r.changed);
     }
     this.refreshed = true;
+    this.sources = listSources(this.env);
     if (changed.length) {
       try { this._saveHistory(); } catch { /* unwritable state dir: keep serving from memory */ }
       this.emit('change', changed);
@@ -97,7 +99,7 @@ export class Store extends EventEmitter {
     return {
       generatedAt: now, price: this.config.prices,
       config: { thresholds: this.config.thresholds, budget: this.config.budget },
-      sources: listSources(this.env), sessions,
+      sources: this.sources, sessions,
     };
   }
 }

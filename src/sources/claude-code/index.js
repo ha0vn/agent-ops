@@ -85,7 +85,11 @@ class ClaudeCodeScanner {
         changed.push(id);
       }
     }
-    for (const key of [...this.sess.keys()]) if (!seen.has(key)) this.sess.delete(key);
+    for (const [key, en] of [...this.sess.entries()]) {
+      if (seen.has(key)) continue;
+      this.sess.delete(key);
+      changed.push(en.built.id); // log disappeared: let clients see logDeleted
+    }
     for (const f of [...this.files.keys()]) if (!seenFiles.has(f)) this.files.delete(f);
     return { changed, sessions: this.sessionsAt(now) };
   }

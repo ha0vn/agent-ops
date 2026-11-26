@@ -52,6 +52,54 @@ test('rebuilds a truncated file from scratch', () => {
   assert.equal(find(store.snapshot(NOW), 's2').tok.out, 3);
 });
 
+test('new subagent file marks the session changed', () => {
+  const store = mk();
+  store.refresh(NOW);
+  const dir = path.join(projects, 'proj-a', 's1', 'subagents');
+  fs.writeFileSync(path.join(dir, 'agent-x.jsonl'), asst(T(7), 'x1', [{ type: 'text', text: 'hi' }], 5));
+  fs.writeFileSync(path.join(dir, 'agent-x.meta.json'), JSON.stringify({ description: 'Extra', toolUseId: 'tu-x', spawnDepth: 1 }));
+  assert.deepEqual(store.refresh(NOW), ['s1']);
+  const ag = find(store.snapshot(NOW), 's1').agents.find((a) => a.key === 'x');
+  assert.ok(ag);
+  assert.equal(ag.tok.out, 5);
+});
+
+test('truncated subagent file is rebuilt, not double counted', () => {
+  const store = mk();
+  store.refresh(NOW);
+  const f = path.join(projects, 'proj-a', 's1', 'subagents', 'agent-a1.jsonl');
+  const content = asst(T(8), 'tr1', [{ type: 'text', text: 'x' }], 100000);
+  assert.ok(content.length < fs.statSync(f).size, 'fixture must shrink');
+  fs.writeFileSync(f, content);
+  fs.utimesSync(f, (NOW + 1000) / 1000, (NOW + 1000) / 1000);
+  assert.deepEqual(store.refresh(NOW), ['s1']);
+  const s = find(store.snapshot(NOW), 's1');
+  const ag = s.agents.find((a) => a.key === 'a1');
+  assert.equal(ag.tok.out, 100000);
+  assert.equal(ag.cost, 2);
+  assert.equal(s.subCost, 2);
+});
+
+test('corrupt history.json does not break the store', () => {
+  fs.mkdirSync(state, { recursive: true });
+  fs.writeFileSync(path.join(state, 'history.json'), '{not json at all');
+  const store = mk();
+  assert.deepEqual(store.refresh(NOW).sort(), ['s1', 's2']);
+  assert.equal(store.snapshot(NOW).sessions.length, 2);
+  assert.doesNotThrow(() => JSON.parse(fs.readFileSync(path.join(state, 'history.json'), 'utf8')));
+});
+
+test('emits change when a log disappears', () => {
+  const store = mk();
+  store.refresh(NOW);
+  const got = [];
+  store.on('change', (ids) => got.push(ids));
+  fs.rmSync(path.join(projects, 'proj-b', 's2.jsonl'));
+  assert.deepEqual(store.refresh(NOW), ['s2']);
+  assert.equal(find(store.snapshot(NOW), 's2').logDeleted, true);
+  assert.deepEqual(got, [['s2']]);
+});
+
 test('emits change', () => {
   const store = mk();
   store.refresh(NOW);
