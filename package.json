@@ -1,0 +1,13 @@
+{
+  "name": "agents-ops",
+  "version": "0.1.0",
+  "description": "Local dashboard for Claude Code sessions: agents, skills, tools and tokens.",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "bin": { "agent-ops": "bin/agent-ops.js" },
+  "scripts": {
+    "test": "node --test",
+    "start": "node bin/agent-ops.js --open"
+  }
+}

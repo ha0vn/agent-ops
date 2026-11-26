@@ -1,0 +1,9 @@
+node_modules/
+.agent-ops/
+*.log
+.DS_Store
+Thumbs.db
+docs/mockups/ao-data.js
+test/.tmp/
+.superpowers/
+screenshots/

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Ops</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/files/ao2.css">
+<style>
+  /* Question: "across every open session, is anything stuck, failing or waiting for me — right now?" */
+  .wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); gap: 14px; }
+  .wall.focus { grid-template-columns: 1fr; }
+  .con { position: relative; border-radius: 14px; background: var(--panel); border: 1px solid var(--hair); padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .con.wait { border-color: color-mix(in srgb, var(--warn) 50%, transparent); }
+  .con.bad { border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+  .con.bad::after, .con.wait::after { content: ""; position: absolute; inset: -1px; border-radius: 14px; pointer-events: none; animation: halo 2.8s ease-in-out infinite; }
+  .con.bad::after { --hc: var(--bad); } .con.wait::after { --hc: var(--warn); }
+  @keyframes halo { 50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--hc) 40%, transparent), 0 0 26px -8px var(--hc); } }
+  .con .hd { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .con .hd .t { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+  .con .sub { font-size: 11.5px; color: var(--faint); margin-top: -6px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .con .body { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; align-items: center; }
+  .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+  .kv span { font-size: 10px; letter-spacing: .14em; color: var(--dim); text-transform: uppercase; }
+  .kv b { display: block; font-size: 19px; font-weight: 300; color: var(--txt); letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+  .lanes { border-top: 1px solid var(--hair); padding-top: 8px; }
+  .lane { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; align-items: center; height: 14px; font-size: 10.5px; color: var(--dim); }
+  .lane .tr { position: relative; height: 3px; background: var(--hair); border-radius: 3px; }
+  .lane .tr i { position: absolute; top: 0; height: 3px; border-radius: 3px; }
+  .feed { border-top: 1px solid var(--hair); padding-top: 6px; }
+  .ev { display: grid; grid-template-columns: 58px 54px 74px minmax(0, 1fr); gap: 8px; font-size: 11.5px; height: 21px; align-items: center; animation: in .5s ease both; }
+  .ev span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ev .x { color: var(--dim); }
+  .ev.err .x { color: var(--bad); }
+  .slot { border: 1px dashed var(--hair2); border-radius: 14px; display: grid; place-items: center; min-height: 150px; color: var(--faint); text-align: center; align-self: start; }
+  .slot .big { font-size: 30px; font-weight: 200; }
+  .ticker { margin-top: 14px; border: 1px solid var(--hair); border-radius: 12px; background: var(--panel); height: 40px; display: flex; align-items: center; overflow: hidden; }
+  .ticker .lb { padding: 0 14px; font-size: 10px; letter-spacing: .24em; color: var(--dim); border-right: 1px solid var(--hair); height: 100%; display: flex; align-items: center; white-space: nowrap; }
+  .ticker .run { display: flex; gap: 34px; white-space: nowrap; padding-left: 20px; animation: marq 80s linear infinite; font-size: 12px; color: var(--dim); }
+  .ticker .run b { font-weight: 500; color: var(--txt); }
+  @keyframes marq { to { transform: translateX(-50%); } }
+  body.fs header.top, body.fs .toolbar .hide-fs { display: none; }
+</style>
+</head>
+<body>
+<script src="/files/ao-data.js"></script>
+<script src="/files/ao2.js"></script>
+<div class="wrap">
+  <script>document.write(AO.header('wall'))</script>
+  <div id="app"></div>
+</div>
+<script>
+const { t, NOW } = AO, q = new URLSearchParams(location.search);
+const layout = q.get('l') || 'grid';
+// open = running or waiting, plus anything active in the last 3h (newest first)
+const open = AO.state === 'empty' ? [] : AO.D.sessions.filter(s => s.status !== 'stop' || NOW - s.t1 < 3 * 3600e3).slice(0, 12);
+const sum = (f) => open.reduce((x, s) => x + f(s), 0);
+const runningAgents = sum(s => s.agents.filter(a => a.status === 'run').length);
+const lbl = a => a.key === 'main' ? t('r.main') : a.label;
+
+let h = AO.banner();
+h += `<div class="toolbar">
+  <span class="chip on">${t('p.live')}<b>${open.length}</b></span>
+  <span class="dim" style="margin-left:6px">${AO.tok(sum(s => s.tokTotal))} ${t('k.tokens').toLowerCase()} · <span data-tip="${AO.esc(t('tip.cost'))}">${AO.usd(sum(s => s.cost))}</span> · ${runningAgents} agent ${t('st.run').toLowerCase()} · ${open.filter(s => s.status === 'wait').length} ${t('st.wait').toLowerCase()}</span>
+  <div class="seg ml hide-fs">${[['grid', '▦'], ['focus', '▭']].map(([k, i]) => `<button class="${layout === k ? 'on' : ''}" onclick="location.search='?l=${k}'">${i} ${k === 'grid' ? (AO.lang === 'en' ? 'Grid' : 'Lưới') : (AO.lang === 'en' ? 'Focus' : 'Tiêu điểm')}</button>`).join('')}</div>
+  <button class="act" onclick="document.body.classList.toggle('fs');document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen().catch(()=>{})">⛶ ${AO.lang === 'en' ? 'Full screen' : 'Toàn màn hình'}</button>
+</div>`;
+
+if (!open.length) { h += `<div class="panel">${AO.emptyState()}</div>`; }
+else {
+  const cards = (layout === 'focus' ? open.slice(0, 1) : open).map(s => {
+    const prob = AO.problems(s), cls = s.status === 'wait' ? 'wait' : prob.some(p => p[0] === 'bad') ? 'bad' : '';
+    const subs = s.agents.slice(1), ts0 = Math.min(s.t1 - 3600e3, ...subs.map(a => a.t0)), span = Math.max(s.t1 - ts0, 1), P = x => Math.max(0, (x - ts0) / span * 100);
+    const lanes = [s.agents[0], ...subs.sort((a, b) => b.t1 - a.t1)].slice(0, 5);
+    const sk = s.skills.length ? s.skills[s.skills.length - 1].name.replace('superpowers:', '') : null;
+    return `<section class="con ${cls}">
+      <div class="hd">${AO.status(s.status)}<span class="t" title="${AO.esc(s.title)}">${AO.esc(s.title)}</span><a class="act" href="/files/session.html?id=${s.id}">${t('a.open')} ↗</a>${s.status === 'wait' ? AO.resumeBtn(s, true) : ''}</div>
+      <div class="sub"><span class="mono">${s.short}</span><span>${AO.esc(s.project)}</span><span>${AO.dur(s.t1 - s.t0)}</span><span>${AO.ago(s.t1)}</span>${prob.map(([lv, x]) => `<span class="flag ${lv}">${x}</span>`).join('')}</div>
+      <div class="body">${AO.orbit(s, { size: 150, mini: true, maxPer: 6 })}
+        <div><div class="kv">
+          <span>${t('k.tokens')}<b>${AO.tok(s.tokTotal)}</b></span><span data-tip="${AO.esc(t('tip.cost'))}">${t('k.cost')}<b>${AO.usd(s.cost)}</b></span>
+          <span data-tip="${AO.esc(t('tip.ctx'))}">${t('k.context')}<b style="${s.ctx > 8e5 ? 'color:var(--bad)' : ''}">${AO.tok(s.ctx)}</b></span><span>${t('k.errors')}<b style="${s.errs > 20 ? 'color:var(--bad)' : ''}">${s.errs ? AO.pct(s.errs / s.calls) : '—'}</b></span></div>
+          <div style="margin-top:10px">${sk ? `<span class="skc">${AO.esc(sk)}</span>` : ''}${Object.keys(s.mcp).map(m => `<span class="mc">${AO.esc(m.replace('claude_ai_', ''))}</span>`).join('')}</div></div></div>
+      <div class="lanes">${lanes.map(a => `<div class="lane"><span>${AO.esc(lbl(a))}</span><div class="tr"><i style="left:${P(a.t0)}%;width:${Math.max(1, P(a.t1) - P(a.t0))}%;background:${AO.color(a)}"></i></div></div>`).join('')}
+        ${s.agents.length > 5 ? `<div class="faint" style="font-size:10.5px;margin-left:72px">+${s.agents.length - 5}</div>` : ''}</div>
+      <div class="feed">${s.events.slice(0, layout === 'focus' ? 12 : 4).map(e => { const a = s.agents.find(x => x.label === e.agent) || s.agents[0];
+        return `<div class="ev ${e.err ? 'err' : ''}"><span class="faint mono">${AO.time2(e.ts)}</span><span style="color:${AO.color(a)}">${AO.esc(lbl(a))}</span><span class="dim">${AO.esc(e.tool.replace(/^mcp__.*__/, ''))}</span><span class="x">${e.err ? '✕ ' : ''}${AO.esc(e.text)}</span></div>`; }).join('')}</div>
+    </section>`; }).join('');
+  h += `<div class="wall ${layout === 'focus' ? 'focus' : ''}">${cards}${layout === 'grid' ? `<a class="slot" href="/files/sessions.html"><div><div class="big">＋</div>${AO.lang === 'en' ? 'Pin a session' : 'Ghim phiên'}</div></a>` : ''}</div>`;
+  const items = open.flatMap(s => s.events.slice(0, 3).map(e => `<span><b>${AO.esc(s.title.split(' ').slice(0, 4).join(' '))}</b> · ${AO.esc(e.agent === 'main' ? t('r.main') : e.agent)} · ${AO.esc(e.tool.replace(/^mcp__.*__/, ''))} ${AO.esc(e.text)}</span>`));
+  h += `<div class="ticker"><div class="lb">${AO.lang === 'en' ? 'ALL SESSIONS' : 'LUỒNG CHUNG'}</div><div class="run">${items.concat(items).join('')}</div></div>`;
+}
+document.getElementById('app').innerHTML = h;
+AO.init();
+</script>
+</body>
+</html>
