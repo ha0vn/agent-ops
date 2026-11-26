@@ -42,7 +42,8 @@
   }
 
   function connect() {
-    if (typeof EventSource === 'undefined') return;
+    // ?static=1: one-shot render without the live stream (screenshots, printing)
+    if (typeof EventSource === 'undefined' || new URLSearchParams(location.search).get('static') === '1') return;
     es = new EventSource('/events');
     es.addEventListener('change', () => { clearTimeout(debounce); debounce = setTimeout(load, 800); });
     es.onerror = () => {

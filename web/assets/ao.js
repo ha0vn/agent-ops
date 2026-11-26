@@ -42,7 +42,10 @@
   };
 
   const AO = g.AO = { D, NOW: Date.now(), T };
-  AO.lang = ls.get('aoLang', 'vi');
+  // ?lang=vi|en overrides and remembers the language (shareable links, screenshots)
+  const qlang = /^(vi|en)$/.test(qs.get('lang') || '') ? qs.get('lang') : null;
+  if (qlang) ls.set('aoLang', qlang);
+  AO.lang = qlang || ls.get('aoLang', 'vi');
   AO.t = k => (T[k] ? T[k][AO.lang === 'en' ? 1 : 0] : k);
   AO.L = AO.lang === 'en' ? 'en-US' : 'vi-VN';
   AO.state = qs.get('state') || 'normal';

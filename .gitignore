@@ -7,3 +7,4 @@ docs/mockups/ao-data.js
 test/.tmp/
 .superpowers/
 screenshots/
+!docs/screenshots/
