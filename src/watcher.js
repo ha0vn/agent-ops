@@ -4,7 +4,7 @@ const RELEVANT = /\.jsonl?$/i;
 
 // Watches `roots` for changes and calls store.refresh(). Native fs.watch is a fast path;
 // the interval poll is the safety net. Returns a stop function.
-export function watch(store, { roots = [], intervalMs = 3000, debounceMs = 400 } = {}) {
+export function watch(store, { roots = [], intervalMs = 3000, debounceMs = 400, onError } = {}) {
   const watchers = [];
   let debounce = null;
   let running = false;
@@ -15,7 +15,7 @@ export function watch(store, { roots = [], intervalMs = 3000, debounceMs = 400 }
     if (stopped) return;
     if (running) { again = true; return; }
     running = true;
-    try { store.refresh(); } catch { /* keep watching */ }
+    try { store.refresh(); } catch (e) { try { onError?.(e); } catch { /* ignore */ } }
     finally { running = false; }
     if (again) { again = false; schedule(); }
   };
@@ -32,7 +32,12 @@ export function watch(store, { roots = [], intervalMs = 3000, debounceMs = 400 }
         if (name && !RELEVANT.test(String(name))) return;
         schedule();
       });
-      w.on('error', () => { try { w.close(); } catch { /* ignore */ } });
+      w.on('error', (e) => {
+        try { w.close(); } catch { /* ignore */ }
+        const i = watchers.indexOf(w);
+        if (i >= 0) watchers.splice(i, 1);
+        try { onError?.(e); } catch { /* ignore */ }
+      });
       watchers.push(w);
     } catch { /* unsupported or missing root: polling only */ }
   }
