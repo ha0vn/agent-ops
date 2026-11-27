@@ -38,7 +38,7 @@ test('serves data and health', () => withServer(47320, async ({ srv }) => {
   assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
   assert.equal((await r.json()).sessions.length, 2);
   const h = await (await fetch(srv.url + '/api/health')).json();
-  assert.equal(h.app, 'agents-ops');
+  assert.equal(h.app, 'agent-ops');
   assert.ok(h.version);
 }));
 

@@ -21,19 +21,19 @@ Agent Ops is a dashboard that runs on your own machine (localhost). It reads Cla
 - **Claude Code plugin** (`/agent-ops` command):
 
   ```
-  /plugin marketplace add ha0vn/agents-ops
-  /plugin install agents-ops@agents-ops
+  /plugin marketplace add ha0vn/agent-ops
+  /plugin install agent-ops@agent-ops
   ```
 - **Manual** (Node.js >= 20, no dependencies to install):
 
   ```sh
-  git clone https://github.com/ha0vn/agents-ops && cd agents-ops
+  git clone https://github.com/ha0vn/agent-ops && cd agent-ops
   node bin/agent-ops.js --open
   ```
 
 ### Usage
 
-Run `/agent-ops` in Claude Code (it may appear as `/agents-ops:agent-ops`), or `npm start`; both start the server and open the browser at `http://127.0.0.1:4317`. If that port is busy the server uses the next free one, and a second launch finds the running instance (checks the port and the next 10) and reuses it. The browser opens on every launch unless you pass `--no-open`. The UI is available in Vietnamese and English.
+Run `/agent-ops` in Claude Code (it may appear as `/agent-ops:agent-ops`), or `npm start`; both start the server and open the browser at `http://127.0.0.1:4317`. If that port is busy the server uses the next free one, and a second launch finds the running instance (checks the port and the next 10) and reuses it. The browser opens on every launch unless you pass `--no-open`. The UI is available in Vietnamese and English.
 
 ### Configuration
 
@@ -89,19 +89,19 @@ Xem ảnh minh hoạ ở phần English phía trên.
 - **Plugin Claude Code** (lệnh `/agent-ops`):
 
   ```
-  /plugin marketplace add ha0vn/agents-ops
-  /plugin install agents-ops@agents-ops
+  /plugin marketplace add ha0vn/agent-ops
+  /plugin install agent-ops@agent-ops
   ```
 - **Chạy tay** (cần Node.js >= 20, không cần cài thư viện):
 
   ```sh
-  git clone https://github.com/ha0vn/agents-ops && cd agents-ops
+  git clone https://github.com/ha0vn/agent-ops && cd agent-ops
   node bin/agent-ops.js --open
   ```
 
 ### Dùng
 
-Mở `/agent-ops` trong Claude Code (lệnh có thể hiện là `/agents-ops:agent-ops`), hoặc chạy `npm start`; cả hai khởi động server và mở trình duyệt tại `http://127.0.0.1:4317`. Cổng bận thì dùng cổng trống kế tiếp; lần chạy thứ hai tự tìm bản đang chạy (cổng đó và 10 cổng sau) và dùng lại. Trình duyệt mở ở mọi lần chạy, trừ khi thêm `--no-open`. Giao diện có tiếng Việt và tiếng Anh.
+Mở `/agent-ops` trong Claude Code (lệnh có thể hiện là `/agent-ops:agent-ops`), hoặc chạy `npm start`; cả hai khởi động server và mở trình duyệt tại `http://127.0.0.1:4317`. Cổng bận thì dùng cổng trống kế tiếp; lần chạy thứ hai tự tìm bản đang chạy (cổng đó và 10 cổng sau) và dùng lại. Trình duyệt mở ở mọi lần chạy, trừ khi thêm `--no-open`. Giao diện có tiếng Việt và tiếng Anh.
 
 ### Cấu hình
 

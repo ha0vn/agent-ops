@@ -45,7 +45,7 @@ thấy cây agent, skill/công cụ, token từng agent; số liệu khớp log;
 ## 3. Ràng buộc
 
 - Node.js ≥ 20 (có sẵn khi dùng Claude Code). Không cần pnpm, Docker, bước build.
-- Thư mục nguồn: thư mục gốc repo `agents-ops/` (repo riêng, đóng gói thành plugin; xem mục 9).
+- Thư mục nguồn: thư mục gốc repo `agent-ops/` (repo riêng, đóng gói thành plugin; xem mục 9).
 - Thư mục log: `$CLAUDE_CONFIG_DIR/projects` nếu biến có đặt, không thì `~/.claude/projects` (mọi hệ điều hành).
 - Định dạng log **không công bố chính thức** → parser chịu lỗi: dòng hỏng / kiểu lạ thì bỏ qua và đếm, không sập.
 - Log lớn (máy hiện tại: ~1GB, 129 phiên / 31 ngày, phiên lớn nhất 71 agent) → đọc tăng dần theo byte offset,

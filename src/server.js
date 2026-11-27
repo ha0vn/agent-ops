@@ -125,7 +125,7 @@ export function startServer({ store, stateDir, webDir, port = 4317, host = '127.
       const isApi = pathname.startsWith('/api/');
       if (req.method !== 'GET' && req.method !== 'HEAD' && !originOk(req)) return send(res, 403, 'forbidden');
 
-      if (pathname === '/api/health' && req.method === 'GET') return sendJson(req, res, 200, { app: 'agents-ops', version: VERSION });
+      if (pathname === '/api/health' && req.method === 'GET') return sendJson(req, res, 200, { app: 'agent-ops', version: VERSION });
       if (pathname === '/api/data' && req.method === 'GET') return sendJson(req, res, 200, store.snapshot(), true);
       if (pathname === '/api/config' && req.method === 'GET') return sendJson(req, res, 200, store.config);
       if (pathname === '/api/config' && req.method === 'POST') {

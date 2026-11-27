@@ -25,7 +25,7 @@ function probe(port) {
     const req = http.get({ host: '127.0.0.1', port, path: '/api/health', headers: { Host: `127.0.0.1:${port}` }, timeout: 400 }, (res) => {
       let b = '';
       res.on('data', (c) => { b += c; });
-      res.on('end', () => { try { resolve(JSON.parse(b).app === 'agents-ops'); } catch { resolve(false); } });
+      res.on('end', () => { try { resolve(JSON.parse(b).app === 'agent-ops'); } catch { resolve(false); } });
     });
     req.on('timeout', () => { req.destroy(); resolve(false); });
     req.on('error', () => resolve(false));

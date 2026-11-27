@@ -1,5 +1,5 @@
 {
-  "name": "agents-ops",
+  "name": "agent-ops",
   "version": "0.1.0",
   "description": "Local dashboard for Claude Code sessions: agents, skills, tools and tokens.",
   "type": "module",

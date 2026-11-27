@@ -29,7 +29,7 @@ test('prints url and serves; second launch reuses instance', async () => {
     assert.ok(await until(() => /http:\/\/127\.0\.0\.1:\d+/.test(a.out())), 'no url printed');
     const url = a.out().match(/http:\/\/127\.0\.0\.1:\d+/)[0];
     const h = await (await fetch(url + '/api/health')).json();
-    assert.equal(h.app, 'agents-ops');
+    assert.equal(h.app, 'agent-ops');
     const t0 = Date.now();
     b = run(env, new URL(url).port);
     const code = await new Promise((res) => b.child.on('exit', res));
